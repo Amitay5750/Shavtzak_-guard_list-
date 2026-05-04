@@ -1,6 +1,7 @@
 let isScheduleGenerated = false;
 let globalSoldiers = [];
 let globalPositions = [];
+let globalExceptions = []; // הזיכרון החדש לחריגים
 
 const MIN_REST_MS = 2 * 60 * 60 * 1000; 
 
@@ -11,41 +12,45 @@ window.onload = () => {
     
     const startInput = document.getElementById('start-time');
     const endInput = document.getElementById('end-time');
+    const excStartInput = document.getElementById('exception-start');
+    const excEndInput = document.getElementById('exception-end');
+    
     if(startInput) startInput.value = start.toISOString().slice(0, 16);
     if(endInput) endInput.value = end.toISOString().slice(0, 16);
+    if(excStartInput) excStartInput.value = start.toISOString().slice(0, 16);
+    if(excEndInput) excEndInput.value = new Date(start.getTime() + 6 * 60 * 60 * 1000).toISOString().slice(0, 16); // ברירת מחדל של 6 שעות תורנות
     
     document.getElementById('soldier-name')?.addEventListener('keypress', e => { if (e.key === 'Enter') addSoldier(); });
     document.getElementById('position-name')?.addEventListener('keypress', e => { if (e.key === 'Enter') addPosition(); });
     document.getElementById('position-duration')?.addEventListener('keypress', e => { if (e.key === 'Enter') addPosition(); });
     document.getElementById('position-req-soldiers')?.addEventListener('keypress', e => { if (e.key === 'Enter') addPosition(); });
     
-    // טעינת נתונים מהדפדפן
     loadDataFromStorage();
 };
 
 function showSection(id) {
     document.getElementById('schedule-section').style.display = id === 'schedule' ? 'block' : 'none';
     document.getElementById('admin-section').style.display = id === 'admin' ? 'block' : 'none';
-    
     document.getElementById('nav-schedule').classList.toggle('active', id === 'schedule');
     document.getElementById('nav-admin').classList.toggle('active', id === 'admin');
 }
 
-// פונקציה חדשה שקוראת את הנתונים מזיכרון הדפדפן (LocalStorage)
 function loadDataFromStorage() {
     const savedSoldiers = localStorage.getItem('soldiersData');
     const savedPositions = localStorage.getItem('positionsData');
+    const savedExceptions = localStorage.getItem('exceptionsData');
 
     if (savedSoldiers) globalSoldiers = JSON.parse(savedSoldiers);
     if (savedPositions) globalPositions = JSON.parse(savedPositions);
+    if (savedExceptions) globalExceptions = JSON.parse(savedExceptions);
 
     updateUI();
 }
 
-// פונקציה חדשה ששומרת נתונים לזיכרון הדפדפן
 function saveDataToStorage() {
     localStorage.setItem('soldiersData', JSON.stringify(globalSoldiers));
     localStorage.setItem('positionsData', JSON.stringify(globalPositions));
+    localStorage.setItem('exceptionsData', JSON.stringify(globalExceptions));
 }
 
 function updateUI() {
@@ -55,15 +60,35 @@ function updateUI() {
     if (totalPositionsEl) totalPositionsEl.innerText = globalPositions.length;
 
     const sList = document.getElementById('admin-soldiers-list');
-    if (sList) {
-        if (globalSoldiers.length === 0) sList.innerHTML = '<li style="color: #95a5a6; font-style: italic;">אין חיילים במערכת</li>';
-        else sList.innerHTML = globalSoldiers.map(s => `<li>• ${s.name}</li>`).join('');
+    const excSoldierSelect = document.getElementById('exception-soldier');
+    
+    if (sList && excSoldierSelect) {
+        excSoldierSelect.innerHTML = '<option value="">בחר חייל...</option>';
+        if (globalSoldiers.length === 0) {
+            sList.innerHTML = '<li style="color: #95a5a6; font-style: italic;">אין חיילים במערכת</li>';
+        } else {
+            sList.innerHTML = globalSoldiers.map(s => `<li>• ${s.name}</li>`).join('');
+            globalSoldiers.forEach(s => {
+                excSoldierSelect.innerHTML += `<option value="${s.name}">${s.name}</option>`;
+            });
+        }
     }
 
     const pList = document.getElementById('admin-positions-list');
     if (pList) {
         if (globalPositions.length === 0) pList.innerHTML = '<li style="color: #95a5a6; font-style: italic;">אין עמדות במערכת</li>';
         else pList.innerHTML = globalPositions.map(p => `<li>• ${p.name} <span style="color:#7f8c8d; font-size:0.9em;">(${p.duration} שעות | ${p.reqSoldiers} חיילים)</span></li>`).join('');
+    }
+
+    const eList = document.getElementById('admin-exceptions-list');
+    if (eList) {
+        if (globalExceptions.length === 0) eList.innerHTML = '<li style="color: #95a5a6; font-style: italic;">אין חריגים במערכת</li>';
+        else eList.innerHTML = globalExceptions.map(e => {
+            let startD = new Date(e.startMs);
+            let endD = new Date(e.endMs);
+            let tStr = `${startD.getDate()}/${startD.getMonth()+1} ${startD.getHours().toString().padStart(2,'0')}:${startD.getMinutes().toString().padStart(2,'0')} - ${endD.getHours().toString().padStart(2,'0')}:${endD.getMinutes().toString().padStart(2,'0')}`;
+            return `<li>• <strong>${e.soldierName}</strong>: ${e.type} <span style="color:#7f8c8d; font-size:0.9em; margin-right:10px;" dir="ltr">${tStr}</span> <button onclick="deleteException(${e.id})" style="background:none; color:red; border:none; padding:0 10px; font-size:0.9em;">(הסר)</button></li>`;
+        }).join('');
     }
 
     renderTable();
@@ -74,17 +99,13 @@ function addSoldier() {
     const val = input.value.trim();
     if (!val) return;
     
-    // ואלידציה 1: בדיקה שהשם לא קיים כבר
-    const nameExists = globalSoldiers.some(s => s.name === val);
-    if (nameExists) {
+    if (globalSoldiers.some(s => s.name === val)) {
         alert("שגיאה: חייל בשם הזה כבר קיים במערכת!");
         return;
     }
     
-    // שמירה מקומית
     globalSoldiers.push({ id: Date.now(), name: val });
     saveDataToStorage();
-    
     input.value = '';
     isScheduleGenerated = false;
     updateUI();
@@ -113,12 +134,44 @@ function addPosition() {
     nameInput.focus();
 }
 
+function addException() {
+    const soldier = document.getElementById('exception-soldier').value;
+    const type = document.getElementById('exception-type').value;
+    const startStr = document.getElementById('exception-start').value;
+    const endStr = document.getElementById('exception-end').value;
+
+    if (!soldier || !startStr || !endStr) {
+        alert("נא למלא את כל השדות להוספת חריגה.");
+        return;
+    }
+
+    const startMs = new Date(startStr).getTime();
+    const endMs = new Date(endStr).getTime();
+
+    if (startMs >= endMs) {
+        alert("זמן סיום חייב להיות אחרי זמן התחלה.");
+        return;
+    }
+
+    globalExceptions.push({ id: Date.now(), soldierName: soldier, type: type, startMs: startMs, endMs: endMs });
+    saveDataToStorage();
+    isScheduleGenerated = false;
+    updateUI();
+}
+
+function deleteException(id) {
+    globalExceptions = globalExceptions.filter(e => e.id !== id);
+    saveDataToStorage();
+    isScheduleGenerated = false;
+    updateUI();
+}
+
 function resetSystem() {
-    if (confirm("פעולה זו תמחק לחלוטין את כל הנתונים. האם להמשיך?")) {
+    if (confirm("פעולה זו תמחק לחלוטין את כל הנתונים כולל חריגים. האם להמשיך?")) {
         globalSoldiers = [];
         globalPositions = [];
-        localStorage.removeItem('soldiersData');
-        localStorage.removeItem('positionsData');
+        globalExceptions = [];
+        localStorage.clear();
         isScheduleGenerated = false;
         updateUI();
     }
@@ -130,14 +183,11 @@ function generateSchedule() {
         return;
     }
 
-    // ואלידציה 2: בדיקת היתכנות כמות כוח אדם למול משימות
     let totalConcurrentSoldiersNeeded = 0;
-    globalPositions.forEach(pos => {
-        totalConcurrentSoldiersNeeded += pos.reqSoldiers;
-    });
+    globalPositions.forEach(pos => totalConcurrentSoldiersNeeded += pos.reqSoldiers);
 
     if (globalSoldiers.length < totalConcurrentSoldiersNeeded) {
-        alert(`שגיאה קריטית: חסר כוח אדם!\nסך העמדות דורשות ${totalConcurrentSoldiersNeeded} חיילים במקביל, אך רשומים רק ${globalSoldiers.length} חיילים במערכת. אנא הוסף חיילים או צמצם עמדות.`);
+        alert(`שגיאה קריטית: חסר כוח אדם!\nסך העמדות דורשות ${totalConcurrentSoldiersNeeded} חיילים במקביל, אך רשומים רק ${globalSoldiers.length} חיילים.`);
         return;
     }
 
@@ -168,8 +218,14 @@ function renderTable() {
     
     let thDay = document.createElement('th');
     thDay.innerText = 'יום';
-    thDay.style.width = '100px';
+    thDay.style.width = '80px';
     headerTr.appendChild(thDay);
+
+    // הוספת כותרת חדשה לחריגים
+    let thExc = document.createElement('th');
+    thExc.innerText = 'מחוץ למצבה';
+    thExc.style.width = '140px';
+    headerTr.appendChild(thExc);
 
     let thTime = document.createElement('th');
     thTime.innerText = 'שעה';
@@ -234,15 +290,32 @@ function renderTable() {
 
                     if (assignedList.includes(candidate)) continue;
 
-                    let overlaps = false;
+                    // סינון אגרסיבי של חריגים (מטבח/בית) - פוסל את החייל לחלוטין מהחישוב
+                    let isExcluded = false;
                     let hasSufficientRest = true;
 
+                    for (let exc of globalExceptions) {
+                        if (exc.soldierName === candidate) {
+                            // האם שעת המשמרת נופלת על שעת ההיעדרות?
+                            if (Math.max(shift.startMs, exc.startMs) < Math.min(shift.endMs, exc.endMs)) {
+                                isExcluded = true;
+                                break;
+                            }
+                            // האם חסרה לו שעת מנוחה בגלל החריגה (למשל הרגע חזר ממטבח)?
+                            if (Math.max(shift.startMs, exc.startMs - MIN_REST_MS) < Math.min(shift.endMs, exc.endMs + MIN_REST_MS)) {
+                                hasSufficientRest = false;
+                            }
+                        }
+                    }
+
+                    if (isExcluded) continue; // החייל הזה לא רלוונטי בכלל למשמרת הזו
+
+                    let overlaps = false;
                     for (let existingShift of soldierAssignments[candidate]) {
                         if (Math.max(shift.startMs, existingShift.start) < Math.min(shift.endMs, existingShift.end)) {
                             overlaps = true;
                             break;
                         }
-                        
                         if (Math.max(shift.startMs, existingShift.start - MIN_REST_MS) < Math.min(shift.endMs, existingShift.end + MIN_REST_MS)) {
                             hasSufficientRest = false;
                         }
@@ -298,12 +371,38 @@ function renderTable() {
             let actualEnd = endOfDay < end ? endOfDay : end;
             let hoursInDay = Math.ceil((actualEnd - curTime) / 3600000);
 
+            // תא היום
             let tdDay = document.createElement('td');
             tdDay.rowSpan = hoursInDay;
             tdDay.innerHTML = `<strong>${daysHe[currentDayTracker]}</strong><br><span style="font-size:0.85em; color:#555">${curTime.toLocaleDateString('he-IL', {day:'2-digit', month:'2-digit'})}</span>`;
             tdDay.style.backgroundColor = '#e8ecef';
             tdDay.style.verticalAlign = 'middle';
             tr.appendChild(tdDay);
+
+            // תא החריגים (חדש!) - מסנן רק חריגים שקורים בתוך טווח היום הזה
+            let startOfDayMs = curTime.getTime();
+            let endOfDayMs = actualEnd.getTime();
+            let dailyExceptions = globalExceptions.filter(e => e.startMs < endOfDayMs && e.endMs > startOfDayMs);
+            
+            let tdExc = document.createElement('td');
+            tdExc.rowSpan = hoursInDay;
+            tdExc.style.backgroundColor = '#fdfefe';
+            tdExc.style.verticalAlign = 'top';
+            tdExc.style.fontSize = '0.9em';
+            
+            if (dailyExceptions.length === 0) {
+                tdExc.innerHTML = '<span style="color:#bdc3c7;">אין</span>';
+            } else {
+                tdExc.innerHTML = dailyExceptions.map(e => {
+                    let s = new Date(e.startMs);
+                    let en = new Date(e.endMs);
+                    let timeStr = `${s.getHours().toString().padStart(2,'0')}:${s.getMinutes().toString().padStart(2,'0')} - ${en.getHours().toString().padStart(2,'0')}:${en.getMinutes().toString().padStart(2,'0')}`;
+                    // צבע שונה למטבח או לבית
+                    let color = e.type === 'מטבח' ? '#d35400' : '#8e44ad';
+                    return `<strong style="color:#2c3e50">${e.soldierName}</strong><br><span style="color:${color}; font-weight:bold;">${e.type}</span><br><span dir="ltr" style="color:#7f8c8d; font-size:0.85em;">${timeStr}</span>`;
+                }).join('<hr style="margin:8px 0; border:0; border-top:1px solid #eee;">');
+            }
+            tr.appendChild(tdExc);
         }
 
         let tdTime = document.createElement('td');
