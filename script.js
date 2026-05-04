@@ -223,7 +223,7 @@ function renderTable() {
 
     // הוספת כותרת חדשה לחריגים
     let thExc = document.createElement('th');
-    thExc.innerText = 'מחוץ למצבה';
+    thExc.innerText = 'מחוץ לשבצק';
     thExc.style.width = '140px';
     headerTr.appendChild(thExc);
 
