@@ -7,92 +7,118 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
-<div class="container">
-    <nav class="sidebar">
-        <div class="sidebar-header">
-            <h2>מערכת שיבוצים</h2>
-        </div>
-        <ul>
-            <li id="nav-schedule" class="active" onclick="showSection('schedule')">לוח שמירות</li>
-            <li id="nav-admin" onclick="showSection('admin')">ניהול והגדרות</li>
-        </ul>
-    </nav>
-
-    <main class="content">
-        <div id="schedule-section">
-            <header>
-                <h1>לוח שיבוץ משמרות</h1>
-                <div>
-                    <button class="btn-generate" onclick="generateSchedule()">שבץ חיילים אוטומטית</button>
-                    <button class="btn-export" onclick="exportToImage()">ייצא לתמונה</button>
-                </div>
-            </header>
-
-            <div class="card">
-                <h3>טווח זמנים ללוח</h3>
-                <div class="input-group" style="align-items: center; max-width: 600px;">
-                    <input type="datetime-local" id="start-time">
-                    <span style="margin: 0 15px; font-weight: bold;">עד</span>
-                    <input type="datetime-local" id="end-time">
-                    <button class="btn-primary" onclick="loadDashboardData()" style="margin-right: 15px;">עדכן</button>
-                </div>
+    <div class="container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h2>מערכת שיבוצים</h2>
             </div>
+            <ul>
+                <li id="nav-schedule" class="active" onclick="showSection('schedule')">לוח שמירות</li>
+                <li id="nav-admin" onclick="showSection('admin')">ניהול והגדרות</li>
+            </ul>
+        </nav>
 
-            <div class="stats">
-                <div class="card stat-card">
-                    <h3>חיילים רשומים</h3>
-                    <p id="total-soldiers">0</p>
-                </div>
-                <div class="card stat-card">
-                    <h3>עמדות פעילות</h3>
-                    <p id="total-positions">0</p>
-                </div>
-            </div>
-
-            <div class="table-container" id="capture-area">
-                <table id="guard-table">
-                    <thead id="guard-table-head"></thead>
-                    <tbody id="guard-table-body"></tbody>
-                </table>
-            </div>
-        </div>
-
-        <div id="admin-section" style="display:none;">
-            <header>
-                <h1>ניהול כוח אדם ועמדות</h1>
-                <button class="btn-danger" onclick="resetSystem()">איפוס כל הנתונים</button>
-            </header>
-
-            <div class="admin-grid">
-                <div class="card">
-                    <h3>הוספת חיילים</h3>
-                    <div class="input-group">
-                        <input type="text" id="soldier-name" placeholder="שם החייל...">
-                        <button onclick="addSoldier()" class="btn-primary">הוסף</button>
+        <main class="content">
+            <!-- לוח שמירות -->
+            <div id="schedule-section">
+                <header>
+                    <h1>לוח שיבוץ משמרות</h1>
+                    <div>
+                        <button class="btn-generate" onclick="generateSchedule()">שבץ חיילים אוטומטית</button>
+                        <button class="btn-export" onclick="exportToImage()">ייצא לתמונה</button>
                     </div>
-                    <div class="data-lists">
-                        <h4>רשימת חיילים:</h4>
-                        <ul id="admin-soldiers-list"></ul>
-                    </div>
-                </div>
+                </header>
 
                 <div class="card">
-                    <h3>הוספת עמדות</h3>
-                    <div class="input-group">
-                        <input type="text" id="position-name" placeholder="שם העמדה...">
-                        <input type="number" id="position-duration" placeholder="שעות (למשל: 4)" style="width: 100px;">
-                        <input type="number" id="position-req-soldiers" placeholder="כמות חיילים" style="width: 100px;">
-                        <button onclick="addPosition()" class="btn-primary">הוסף</button>
+                    <h3>טווח זמנים ללוח</h3>
+                    <div class="input-group" style="align-items: center; max-width: 600px;">
+                        <input type="datetime-local" id="start-time">
+                        <span style="margin: 0 15px; font-weight: bold;">עד</span>
+                        <input type="datetime-local" id="end-time">
+                        <button class="btn-primary" onclick="renderTable()" style="margin-right: 15px;">עדכן חיתוך</button>
                     </div>
-                    <div class="data-lists">
-                        <h4>רשימת עמדות:</h4>
-                        <ul id="admin-positions-list"></ul>
+                </div>
+
+                <div class="stats">
+                    <div class="card stat-card">
+                        <h3>חיילים רשומים</h3>
+                        <p id="total-soldiers">0</p>
+                    </div>
+                    <div class="card stat-card">
+                        <h3>עמדות פעילות</h3>
+                        <p id="total-positions">0</p>
+                    </div>
+                </div>
+
+                <div class="table-container" id="capture-area">
+                    <table id="guard-table">
+                        <thead id="guard-table-head"></thead>
+                        <tbody id="guard-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- דף ניהול והגדרות -->
+            <div id="admin-section" style="display:none;">
+                <header>
+                    <h1>ניהול כוח אדם ועמדות</h1>
+                    <button class="btn-danger" onclick="resetSystem()">איפוס כל הנתונים</button>
+                </header>
+                
+                <div class="admin-grid">
+                    <!-- חיילים -->
+                    <div class="card">
+                        <h3>הוספת חיילים</h3>
+                        <div class="input-group">
+                            <input type="text" id="soldier-name" placeholder="שם החייל...">
+                            <button onclick="addSoldier()" class="btn-primary">הוסף</button>
+                        </div>
+                        <div class="data-lists">
+                            <h4>רשימת חיילים:</h4>
+                            <ul id="admin-soldiers-list"></ul>
+                        </div>
+                    </div>
+
+                    <!-- עמדות -->
+                    <div class="card">
+                        <h3>הוספת עמדות</h3>
+                        <div class="input-group">
+                            <input type="text" id="position-name" placeholder="שם העמדה...">
+                            <input type="number" id="position-duration" placeholder="שעות" style="width: 80px;">
+                            <input type="number" id="position-req-soldiers" placeholder="כמות" style="width: 80px;">
+                            <button onclick="addPosition()" class="btn-primary">הוסף</button>
+                        </div>
+                        <div class="data-lists">
+                            <h4>רשימת עמדות:</h4>
+                            <ul id="admin-positions-list"></ul>
+                        </div>
+                    </div>
+
+                    <!-- חריגים (מטבח/בית) -->
+                    <div class="card" style="grid-column: 1 / -1;">
+                        <h3>חריגים (מטבח, אפטר, פטורים)</h3>
+                        <div class="input-group" style="align-items: center;">
+                            <select id="exception-soldier" style="padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
+                                <option value="">בחר חייל...</option>
+                            </select>
+                            <select id="exception-type" style="padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
+                                <option value="מטבח">תורנות מטבח</option>
+                                <option value="בית">חופשה / בית</option>
+                                <option value="פטור/אחר">פטור / אחר</option>
+                            </select>
+                            מ: <input type="datetime-local" id="exception-start" style="width: 150px;">
+                            עד: <input type="datetime-local" id="exception-end" style="width: 150px;">
+                            <button onclick="addException()" class="btn-primary">הוסף חריגה</button>
+                        </div>
+                        <div class="data-lists">
+                            <h4>רשימת חריגים:</h4>
+                            <ul id="admin-exceptions-list"></ul>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </main>
-</div>
-<script src="script.js"></script>
+        </main>
+    </div>
+    <script src="script.js"></script>
 </body>
 </html>
