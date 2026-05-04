@@ -1,0 +1,47 @@
+:root {
+    --primary: #2c3e50;
+    --accent: #27ae60;
+    --danger: #e74c3c;
+    --bg: #f4f7f6;
+    --text: #333;
+}
+
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); margin: 0; direction: rtl; color: var(--text); }
+.container { display: flex; min-height: 100vh; }
+
+.sidebar { width: 250px; background: var(--primary); color: white; padding: 20px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index: 10;}
+.sidebar h2 { text-align: center; margin-bottom: 30px; border-bottom: 1px solid #34495e; padding-bottom: 15px; }
+.sidebar ul { list-style: none; padding: 0; }
+.sidebar li { padding: 15px; margin-bottom: 10px; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 1.1em;}
+.sidebar li:hover, .sidebar li.active { background: var(--accent); }
+
+.content { flex: 1; padding: 40px; overflow-y: auto; }
+header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+
+.card { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 25px; }
+
+/* Tables - עודכן לקווים בולטים ותאים צרים יותר */
+.table-container { background: white; overflow-x: auto; padding: 10px; }
+table { width: 100%; border-collapse: collapse; text-align: center; }
+/* הקטנת הריפוד (padding) ועיבוי הגבולות (border: 2px solid) */
+th, td { padding: 8px 5px; border: 2px solid #34495e; font-size: 0.95em; }
+th { background: #ecf0f1; color: #2c3e50; font-weight: bold; font-size: 1em; }
+
+.admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
+.input-group { display: flex; gap: 10px; margin-bottom: 20px; }
+input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 1em; }
+
+.data-lists { border-top: 1px solid #eee; padding-top: 15px; margin-top: 15px; }
+.data-lists h4 { margin: 0 0 10px 0; color: #7f8c8d; }
+.data-lists ul { list-style: none; padding: 0; max-height: 250px; overflow-y: auto; }
+.data-lists li { padding: 10px; border-bottom: 1px solid #f9f9f9; display: flex; align-items: center; }
+
+button { cursor: pointer; border: none; border-radius: 6px; font-weight: bold; font-size: 1em; transition: 0.2s; }
+.btn-primary { background: var(--accent); color: white; padding: 12px 20px; }
+.btn-primary:hover { opacity: 0.9; }
+.btn-danger { background: var(--danger); color: white; padding: 12px 20px; }
+.btn-danger:hover { background: #c0392b; }
+.btn-generate { background: var(--primary); color: white; padding: 12px 25px; font-size: 1.1em; }
+/* כפתור ייצוא חדש */
+.btn-export { background: #f39c12; color: white; padding: 12px 25px; font-size: 1.1em; margin-right: 10px; }
+.btn-export:hover { background: #d68910; }
