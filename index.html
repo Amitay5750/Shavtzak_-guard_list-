@@ -25,7 +25,7 @@
                 <header>
                     <h1>לוח שיבוץ משמרות</h1>
                     <div>
-                        <button class="btn-generate" onclick="generateSchedule()">שבץ חיילים אוטומטית</button>
+                        <button class="btn-generate" onclick="generateSchedule()">צור/עדכן טבלה</button>
                         <button class="btn-export" onclick="exportToImage()">ייצא לתמונה</button>
                     </div>
                 </header>
@@ -65,7 +65,7 @@
                 </header>
                 
                 <div class="card">
-                    <h3>בחירת חייל לתחקור</h3>
+                    <h3>בחירת חייל </h3>
                     <div class="input-group" style="max-width: 400px;">
                         <select id="report-soldier-select" style="padding: 12px; border: 1px solid #ddd; border-radius: 6px; flex:1;">
                             <option value="">בחר חייל...</option>
@@ -182,7 +182,7 @@
                 
                 <div class="admin-grid">
                     <div class="card">
-                        <h3>הוספת חיילים</h3>
+                        <h3>הוספת / עריכת חיילים</h3>
                         <div class="input-group" style="align-items: center;">
                             <input type="text" id="soldier-name" placeholder="שם החייל...">
                             <label style="margin:0 10px; cursor:pointer; font-weight:bold;">
@@ -197,13 +197,21 @@
                     </div>
 
                     <div class="card">
-                        <h3>הוספת עמדות / משימות</h3>
-                        <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;">
+                        <h3>הוספת / עריכת משימות</h3>
+                        <div style="display:flex; flex-direction:column; gap:15px; margin-bottom:15px;">
                             <input type="text" id="position-name" placeholder="שם העמדה / משימה...">
-                            <div style="display:flex; gap:10px;">
-                                <input type="number" id="position-duration" placeholder="שעות שמירה" style="width: 100px;">
-                                <input type="number" id="position-req-soldiers" placeholder="כמות חיילים בעמדה" style="width: 160px;">
+                            
+                            <div style="display:flex; gap:15px; align-items:center; background:#f8f9fa; padding:10px; border-radius:6px; border:1px solid #ddd;">
+                                <div style="display:flex; align-items:center; gap:5px;">
+                                    <span style="font-weight:bold; color:#2c3e50; font-size:0.9em;">משך (שעות):</span>
+                                    <input type="number" id="position-duration" style="width: 70px; padding:8px;">
+                                </div>
+                                <div style="display:flex; align-items:center; gap:5px;">
+                                    <span style="font-weight:bold; color:#2c3e50; font-size:0.9em;">כמות חיילים:</span>
+                                    <input type="number" id="position-req-soldiers" style="width: 70px; padding:8px;">
+                                </div>
                             </div>
+                            
                             <label style="cursor:pointer; font-weight:bold;">
                                 <input type="checkbox" id="position-req-driver" style="width:auto;"> האם דרוש נהג למשימה זו?
                             </label>
@@ -217,7 +225,7 @@
 
                     <div class="card" style="grid-column: 1 / -1;">
                         <h3>חריגים (מטבח, אפטר, פטורים)</h3>
-                        <div class="input-group" style="align-items: center;">
+                        <div class="input-group" style="align-items: center; flex-wrap:wrap; gap:15px;">
                             <select id="exception-soldier" style="padding: 12px; border: 1px solid #ddd; border-radius: 6px;">
                                 <option value="">בחר חייל...</option>
                             </select>
@@ -226,8 +234,14 @@
                                 <option value="בית">חופשה / בית</option>
                                 <option value="פטור/אחר">פטור / אחר</option>
                             </select>
-                            מ: <input type="datetime-local" id="exception-start" style="width: 150px;">
-                            עד: <input type="datetime-local" id="exception-end" style="width: 150px;">
+                            <div style="display:flex; align-items:center; gap:5px;">
+                                <span style="font-weight:bold; font-size:0.9em;">מ:</span>
+                                <input type="datetime-local" id="exception-start" style="width: 150px;">
+                            </div>
+                            <div style="display:flex; align-items:center; gap:5px;">
+                                <span style="font-weight:bold; font-size:0.9em;">עד:</span>
+                                <input type="datetime-local" id="exception-end" style="width: 150px;">
+                            </div>
                             <button onclick="addException()" class="btn-primary">הוסף חריגה</button>
                         </div>
                         <div class="data-lists">
@@ -243,7 +257,7 @@
     <div id="advisor-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; justify-content:center; align-items:center;">
         <div class="card" style="max-width:650px; width:90%; position:relative; background:#fff; padding:30px; border-radius:10px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
             <button onclick="closeAdvisor()" style="position:absolute; top:15px; left:15px; background:none; border:none; font-size:2em; cursor:pointer; color:#e74c3c; line-height:1;">&times;</button>
-            <h2 style="color:#8e44ad; margin-top:0; border-bottom:2px solid #8e44ad; padding-bottom:10px;">🧠 יועץ תכנון סד"כ</h2>
+            <h2 style="color:#8e44ad; margin-top:0; border-bottom:2px solid #8e44ad; padding-bottom:10px;">🧠 יועץ תכנון סד"כ והמלצות אידיאליות</h2>
             <div id="advisor-content" style="line-height:1.6; font-size:1.1em; max-height: 60vh; overflow-y: auto; padding-left: 10px;">
             </div>
             <button onclick="closeAdvisor()" class="btn-primary" style="margin-top:20px; width:100%; background:#8e44ad;">הבנתי, סגור חלונית</button>
