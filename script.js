@@ -3,12 +3,25 @@ let globalSoldiers = [];
 let globalPositions = [];
 let globalExceptions = []; 
 
-// מנוע השיבוץ הראשי החדש! המערכת שומרת את הלוח כאובייקט
 let globalSchedule = []; 
 let globalStats = {}; 
 
 const MIN_REST_MS = 2 * 60 * 60 * 1000; 
-const DRIVER_SLEEP_MS = 6 * 60 * 60 * 1000; // 6 שעות חסימה לנהג
+const DRIVER_SLEEP_MS = 6 * 60 * 60 * 1000; 
+
+// פונקציית עזר חדשה לחישוב מדויק של שעות הלילה בתוך משמרת (00:00 - 06:00)
+function calculateNightMs(startMs, endMs) {
+    let nightMs = 0;
+    let cur = new Date(startMs);
+    while (cur.getTime() < endMs) {
+        let h = cur.getHours();
+        if (h >= 0 && h < 6) {
+            nightMs += 3600000; // מוסיף שעה
+        }
+        cur = new Date(cur.getTime() + 3600000);
+    }
+    return nightMs;
+}
 
 window.onload = () => {
     const now = new Date();
@@ -231,7 +244,6 @@ function resetSystem() {
     }
 }
 
-// ---------------- מנוע בניית הלוח ----------------
 function generateSchedule() {
     if (globalSoldiers.length === 0 || globalPositions.length === 0) {
         return alert("יש להזין לפחות חייל אחד ועמדה אחת כדי לבצע שיבוץ.");
@@ -242,9 +254,8 @@ function generateSchedule() {
     const start = new Date(startInput ? startInput.value : new Date());
     const end = new Date(endInput ? endInput.value : new Date().getTime() + 86400000);
 
-    globalSchedule = []; // איפוס הלוח הקודם
+    globalSchedule = []; 
     
-    // יצירת מבנה הבלוקים של השמירות
     globalPositions.forEach(pos => {
         let cur = new Date(start);
         while (cur < end) {
@@ -252,7 +263,7 @@ function generateSchedule() {
             if (next > end) next = end;
             
             globalSchedule.push({
-                id: pos.id + '_' + cur.getTime(), // ID ייחודי למשמרת בלוח
+                id: pos.id + '_' + cur.getTime(), 
                 posId: pos.id,
                 posName: pos.name,
                 startMs: cur.getTime(),
@@ -260,7 +271,7 @@ function generateSchedule() {
                 durationHours: Math.round((next - cur) / 3600000),
                 reqSoldiers: pos.reqSoldiers,
                 reqDriver: pos.reqDriver,
-                soldiers: [] // יתמלא באלגוריתם
+                soldiers: [] 
             });
             cur = next;
         }
@@ -274,8 +285,7 @@ function generateSchedule() {
     globalSoldiers.forEach(s => { tempStats[s.name] = { totalMs: 0, nightMs: 0, lastEnd: 0 }; });
 
     globalSchedule.forEach(shift => {
-        let shiftHour = new Date(shift.startMs).getHours();
-        let isNightShift = (shiftHour >= 0 && shiftHour < 6); // עודכן ל-00:00 עד 06:00
+        let shiftNightMs = calculateNightMs(shift.startMs, shift.endMs);
         
         for (let slot = 0; slot < shift.reqSoldiers; slot++) {
             let isDriverRequiredForThisSlot = (shift.reqDriver && slot === 0); 
@@ -295,7 +305,6 @@ function generateSchedule() {
                 }
                 if (isExcluded) return; 
 
-                // בדיקת מנוחה בסיסית (שעתיים)
                 let hasSufficientRest = true;
                 for (let existingShift of tempAssignments[candidate]) {
                     if (Math.max(shift.startMs, existingShift.start - MIN_REST_MS) < Math.min(shift.endMs, existingShift.end + MIN_REST_MS)) {
@@ -310,7 +319,6 @@ function generateSchedule() {
                     }
                 }
                 
-                // בדיקת מנוחת נהג אגרסיבית (6 שעות לפני המשמרת!)
                 if (hasSufficientRest && isDriverRequiredForThisSlot) {
                     for (let existingShift of tempAssignments[candidate]) {
                         if (Math.max(shift.startMs - DRIVER_SLEEP_MS, existingShift.start) < Math.min(shift.startMs, existingShift.end)) {
@@ -345,8 +353,11 @@ function generateSchedule() {
             });
             
             validCandidates.sort((a, b) => {
-                if (isNightShift && (a.nightMs - b.nightMs !== 0)) return a.nightMs - b.nightMs;
+                // העדפה ראשונה: לאזן לילות (רק אם יש שעות לילה במשמרת הזו)
+                if (shiftNightMs > 0 && (a.nightMs - b.nightMs !== 0)) return a.nightMs - b.nightMs;
+                // העדפה שנייה: לאזן סך שעות כללי
                 if (a.totalMs - b.totalMs !== 0) return a.totalMs - b.totalMs;
+                // העדפה שלישית: מי נח הכי הרבה זמן
                 return a.lastEnd - b.lastEnd;
             });
             
@@ -358,7 +369,7 @@ function generateSchedule() {
                  tempAssignments[chosen].push({start: shift.startMs, end: shift.endMs});
                  let shiftDurationMs = shift.endMs - shift.startMs;
                  tempStats[chosen].totalMs += shiftDurationMs;
-                 if (isNightShift) tempStats[chosen].nightMs += shiftDurationMs;
+                 if (shiftNightMs > 0) tempStats[chosen].nightMs += shiftNightMs;
                  tempStats[chosen].lastEnd = Math.max(tempStats[chosen].lastEnd, shift.endMs);
             }
             shift.soldiers.push(chosen);
@@ -372,7 +383,6 @@ function generateSchedule() {
     populateControlTab();
 }
 
-// ---------------- בניית הסטטיסטיקות לאחר שהלוח קיים ----------------
 function recalculateStats() {
     globalStats = {};
     globalSoldiers.forEach(s => {
@@ -380,22 +390,20 @@ function recalculateStats() {
     });
 
     globalSchedule.forEach(shift => {
-        let shiftHour = new Date(shift.startMs).getHours();
-        let isNightShift = (shiftHour >= 0 && shiftHour < 6);
+        let shiftNightMs = calculateNightMs(shift.startMs, shift.endMs);
         let shiftDurationMs = shift.endMs - shift.startMs;
 
         shift.soldiers.forEach(soldierName => {
             if (globalStats[soldierName]) {
                 globalStats[soldierName].shiftsCount++;
                 globalStats[soldierName].totalMs += shiftDurationMs;
-                if (isNightShift) globalStats[soldierName].nightMs += shiftDurationMs;
+                if (shiftNightMs > 0) globalStats[soldierName].nightMs += shiftNightMs;
                 globalStats[soldierName].assignments.push({ start: shift.startMs, end: shift.endMs, posName: shift.posName, shiftId: shift.id });
             }
         });
     });
 }
 
-// ---------------- ציור הלוח (מתוך הזיכרון בלבד!) ----------------
 function renderTable() {
     if (!isScheduleGenerated) return;
 
@@ -478,7 +486,6 @@ function renderTable() {
         tr.appendChild(tdTime);
 
         globalPositions.forEach(pos => {
-            // חיפוש בלוח שנשמר
             let shiftData = globalSchedule.find(s => s.posId === pos.id && s.startMs === curTime.getTime());
             
             if (shiftData) {
@@ -504,10 +511,7 @@ function renderTable() {
     }
 }
 
-// ---------------- שאילתות, בקרה והחלפות ----------------
-
 function populateControlTab() {
-    // 1. ציור טבלת הסיכום הפלוגתית
     const tbody = document.getElementById('control-summary-tbody');
     tbody.innerHTML = '';
     
@@ -515,15 +519,23 @@ function populateControlTab() {
         let st = globalStats[s.name];
         let tHours = st.totalMs / 3600000;
         let nHours = st.nightMs / 3600000;
+        
+        let excHours = 0;
+        globalExceptions.forEach(e => {
+            if (e.soldierName === s.name) {
+                excHours += (e.endMs - e.startMs) / 3600000;
+            }
+        });
+
         tbody.innerHTML += `<tr>
             <td style="font-weight:bold;">${s.name} ${s.isDriver ? '🚗' : ''}</td>
             <td>${st.shiftsCount}</td>
             <td>${tHours} ש'</td>
             <td>${nHours} ש'</td>
+            <td style="color:#d35400;">${excHours} ש'</td>
         </tr>`;
     });
 
-    // 2. אכלוס תפריט ההחלפות
     const outSelect = document.getElementById('swap-soldier-out');
     const inSelect = document.getElementById('swap-soldier-in');
     
@@ -564,7 +576,6 @@ function executeSwap() {
     let targetShift = globalSchedule.find(s => s.id === shiftId);
     if (!targetShift) return alert("משמרת לא נמצאה.");
 
-    // ואלידציות של חייל נכנס
     if (targetShift.soldiers.includes(soldierIn)) return alert("החייל המחליף כבר משובץ במשמרת זו!");
 
     let isTargetDriver = globalSoldiers.find(s => s.name === soldierIn)?.isDriver;
@@ -573,7 +584,6 @@ function executeSwap() {
         return alert("שגיאה קשיחה: עמדה זו דורשת נהג, והמחליף אינו מוסמך!");
     }
 
-    // בדיקת התנגשויות זמן
     let inStats = globalStats[soldierIn];
     for (let s of inStats.assignments) {
         if (Math.max(targetShift.startMs, s.start) < Math.min(targetShift.endMs, s.end)) {
@@ -586,7 +596,6 @@ function executeSwap() {
         }
     }
 
-    // בדיקת אזהרת מנוחה רכה
     let restViolation = false;
     for (let s of inStats.assignments) {
         if (Math.max(targetShift.startMs, s.start - MIN_REST_MS) < Math.min(targetShift.endMs, s.end + MIN_REST_MS)) restViolation = true;
@@ -599,7 +608,6 @@ function executeSwap() {
         if (!confirm(`אזהרת מערכת: ההחלפה תגרום ל-${soldierIn} לשמור עם פחות משעתיים מנוחה. האם לאשר בכל זאת?`)) return;
     }
 
-    // ביצוע ההחלפה בפועל!
     let indexToReplace = targetShift.soldiers.indexOf(soldierOut);
     targetShift.soldiers[indexToReplace] = soldierIn;
 
@@ -607,7 +615,7 @@ function executeSwap() {
     recalculateStats();
     renderTable();
     populateControlTab();
-    populateSwapShifts(); // רענון הרשימה אחרי שמשמרת אחת עברה
+    populateSwapShifts(); 
     alert("ההחלפה בוצעה בהצלחה!");
 }
 
@@ -623,13 +631,12 @@ function runFairnessCheck() {
         let stats = globalStats[s.name];
         let hours = stats.totalMs / 3600000;
         
-        // בדיקת חריגת שעות
-        if (Math.abs(hours - avgHours) > 3) {
+        // צמצמנו את הרגישות ל-1.5 שעות חריגה במקום 3!
+        if (Math.abs(hours - avgHours) >= 1.5) {
             resultsUl.innerHTML += `<li>⚠️ פער שעות: ${s.name} סוגר ${hours} שעות, בעוד הממוצע הוא ${avgHours.toFixed(1)}.</li>`;
             issuesFound++;
         }
 
-        // בדיקת רצפי שמירה (מנוחה)
         let sortedAssignments = [...stats.assignments].sort((a,b) => a.start - b.start);
         for (let i = 0; i < sortedAssignments.length - 1; i++) {
             let gap = (sortedAssignments[i+1].start - sortedAssignments[i].end) / 3600000;
@@ -639,7 +646,6 @@ function runFairnessCheck() {
             }
         }
         
-        // בדיקת התנגשות חריגים (למקרה שהוחלף ידנית)
         globalExceptions.forEach(exc => {
             if(exc.soldierName === s.name) {
                 sortedAssignments.forEach(asg => {
@@ -657,7 +663,6 @@ function runFairnessCheck() {
     }
 }
 
-// ---------------- הדו"ח האישי ----------------
 function generateSoldierReport() {
     if (!isScheduleGenerated) return alert("יש לייצר לוח לפני הפקת דו\"ח.");
     
