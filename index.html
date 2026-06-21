@@ -19,7 +19,6 @@
         </nav>
 
         <main class="content">
-            <!-- לוח שמירות -->
             <div id="schedule-section">
                 <header>
                     <h1>לוח שיבוץ משמרות</h1>
@@ -58,7 +57,6 @@
                 </div>
             </div>
 
-            <!-- דף ניהול והגדרות -->
             <div id="admin-section" style="display:none;">
                 <header>
                     <h1>ניהול כוח אדם ועמדות</h1>
@@ -66,7 +64,6 @@
                 </header>
                 
                 <div class="admin-grid">
-                    <!-- חיילים -->
                     <div class="card">
                         <h3>הוספת חיילים</h3>
                         <div class="input-group">
@@ -79,13 +76,12 @@
                         </div>
                     </div>
 
-                    <!-- עמדות -->
                     <div class="card">
                         <h3>הוספת עמדות</h3>
                         <div class="input-group">
                             <input type="text" id="position-name" placeholder="שם העמדה...">
-                            <input type="number" id="position-duration" placeholder="שעות" style="width: 80px;">
-                            <input type="number" id="position-req-soldiers" placeholder="כמות" style="width: 80px;">
+                            <input type="number" id="position-duration" placeholder="כמה זמן שמירה" style="width: 140px;">
+                            <input type="number" id="position-req-soldiers" placeholder="כמה חיילים בעמדה/משימה" style="width: 190px;">
                             <button onclick="addPosition()" class="btn-primary">הוסף</button>
                         </div>
                         <div class="data-lists">
@@ -94,7 +90,6 @@
                         </div>
                     </div>
 
-                    <!-- חריגים (מטבח/בית) -->
                     <div class="card" style="grid-column: 1 / -1;">
                         <h3>חריגים (מטבח, אפטר, פטורים)</h3>
                         <div class="input-group" style="align-items: center;">
