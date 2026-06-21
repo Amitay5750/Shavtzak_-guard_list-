@@ -6,7 +6,6 @@ let globalExceptions = [];
 let globalSchedule = []; 
 let globalStats = {}; 
 
-// משתנים למעקב אחרי מצב עריכה
 let editingSoldierId = null;
 let editingPositionId = null;
 
@@ -79,7 +78,6 @@ function loadDataFromStorage() {
         isScheduleGenerated = true;
         recalculateStats();
     }
-
     updateUI();
 }
 
@@ -160,7 +158,6 @@ function updateUI() {
     }
 }
 
-// ---- פונקציות עריכה לחיילים ----
 function editSoldier(id) {
     const soldier = globalSoldiers.find(s => s.id === id);
     if (!soldier) return;
@@ -169,10 +166,7 @@ function editSoldier(id) {
     editingSoldierId = id;
     
     const btn = document.getElementById('btn-save-soldier');
-    if(btn) {
-        btn.innerText = 'שמור שינויים';
-        btn.style.background = '#f39c12';
-    }
+    if(btn) { btn.innerText = 'שמור שינויים'; btn.style.background = '#f39c12'; }
 }
 
 function saveSoldier() {
@@ -182,19 +176,14 @@ function saveSoldier() {
     if (!val) return;
     
     if (editingSoldierId) {
-        if (globalSoldiers.some(s => s.name === val && s.id !== editingSoldierId)) {
-            return alert("שגיאה: חייל בשם הזה כבר קיים במערכת!");
-        }
+        if (globalSoldiers.some(s => s.name === val && s.id !== editingSoldierId)) return alert("שגיאה: חייל בשם הזה כבר קיים במערכת!");
         let soldier = globalSoldiers.find(s => s.id === editingSoldierId);
         let oldName = soldier.name;
         soldier.name = val;
         soldier.isDriver = isDriverInput.checked;
         
-        // עדכון חריגים אם השם שונה
         if (oldName !== val) {
-            globalExceptions.forEach(e => {
-                if (e.soldierName === oldName) e.soldierName = val;
-            });
+            globalExceptions.forEach(e => { if (e.soldierName === oldName) e.soldierName = val; });
             isScheduleGenerated = false; 
         } else if (soldier.isDriver !== isDriverInput.checked) {
             isScheduleGenerated = false; 
@@ -202,19 +191,14 @@ function saveSoldier() {
         
         editingSoldierId = null;
         const btn = document.getElementById('btn-save-soldier');
-        if(btn) {
-            btn.innerText = 'הוסף';
-            btn.style.background = '';
-        }
+        if(btn) { btn.innerText = 'הוסף'; btn.style.background = ''; }
     } else {
         if (globalSoldiers.some(s => s.name === val)) return alert("שגיאה: חייל בשם הזה כבר קיים במערכת!");
         globalSoldiers.push({ id: Date.now(), name: val, isDriver: isDriverInput.checked });
         isScheduleGenerated = false;
     }
     
-    saveDataToStorage();
-    input.value = ''; isDriverInput.checked = false; 
-    updateUI(); input.focus();
+    saveDataToStorage(); input.value = ''; isDriverInput.checked = false; updateUI(); input.focus();
 }
 
 function deleteSoldier(id) {
@@ -224,7 +208,6 @@ function deleteSoldier(id) {
     saveDataToStorage(); isScheduleGenerated = false; updateUI();
 }
 
-// ---- פונקציות עריכה לעמדות ----
 function editPosition(id) {
     const pos = globalPositions.find(p => p.id === id);
     if (!pos) return;
@@ -235,10 +218,7 @@ function editPosition(id) {
     editingPositionId = id;
     
     const btn = document.getElementById('btn-save-position');
-    if(btn) {
-        btn.innerText = 'שמור שינויים';
-        btn.style.background = '#f39c12';
-    }
+    if(btn) { btn.innerText = 'שמור שינויים'; btn.style.background = '#f39c12'; }
 }
 
 function savePosition() {
@@ -255,23 +235,15 @@ function savePosition() {
     
     if (editingPositionId) {
         let pos = globalPositions.find(p => p.id === editingPositionId);
-        pos.name = name;
-        pos.duration = dur;
-        pos.reqSoldiers = req;
-        pos.reqDriver = reqDriverInput.checked;
-        
+        pos.name = name; pos.duration = dur; pos.reqSoldiers = req; pos.reqDriver = reqDriverInput.checked;
         editingPositionId = null;
         const btn = document.getElementById('btn-save-position');
-        if(btn) {
-            btn.innerText = 'הוסף משימה';
-            btn.style.background = '';
-        }
+        if(btn) { btn.innerText = 'הוסף משימה'; btn.style.background = ''; }
     } else {
         globalPositions.push({ id: Date.now(), name: name, duration: dur, reqSoldiers: req, reqDriver: reqDriverInput.checked });
     }
     
-    saveDataToStorage();
-    nameInput.value = ''; durInput.value = ''; reqInput.value = ''; reqDriverInput.checked = false;
+    saveDataToStorage(); nameInput.value = ''; durInput.value = ''; reqInput.value = ''; reqDriverInput.checked = false;
     isScheduleGenerated = false; updateUI(); nameInput.focus();
 }
 
@@ -288,8 +260,7 @@ function addException() {
 
     if (!soldier || !startStr || !endStr) return alert("נא למלא את כל השדות להוספת חריגה.");
 
-    const startMs = new Date(startStr).getTime();
-    const endMs = new Date(endStr).getTime();
+    const startMs = new Date(startStr).getTime(); const endMs = new Date(endStr).getTime();
     if (startMs >= endMs) return alert("זמן סיום חייב להיות אחרי זמן התחלה.");
 
     globalExceptions.push({ id: Date.now(), soldierName: soldier, type: type, startMs: startMs, endMs: endMs });
@@ -309,7 +280,7 @@ function resetSystem() {
     }
 }
 
-// ---------------- יועץ תכנון חכם ----------------
+// ---------------- יועץ תכנון חכם משודרג ----------------
 function openAdvisor() {
     let driversCount = globalSoldiers.filter(s => s.isDriver).length;
     let totalSoldiers = globalSoldiers.length;
@@ -321,54 +292,59 @@ function openAdvisor() {
         if (p.reqDriver) driverPositions++;
     });
 
-    let content = `<h3 style="color:#2c3e50;">🚗 ניתוח משימות נהיגה</h3>`;
+    let content = `<h3 style="color:#2c3e50;">📐 כללי ברזל לתכנון מתמטי (מניעת 'חורים' בלוח)</h3>`;
+    content += `<p style="background:#eafaf1; padding:10px; border-radius:6px; font-size:0.95em;">
+        היממה מורכבת מ-24 שעות. כדי שהלוח ירוץ בצורה חלקה ולחיילים לא יווצרו שברים ושאריות שמקפיצים אותם שוב ושוב לעמדות, 
+        <strong>משך כל משמרת חייב להיות מספר שמתחלק ב-24 ללא שארית</strong>. <br>
+        האורכים האידיאליים היחידים האפשריים הם: <strong>2, 3, 4, 6 או 8 שעות.</strong>
+    </p>`;
+
+    content += `<h3 style="color:#2c3e50; margin-top:25px;">🚗 ניתוח משימות נהיגה בהתאמה אישית</h3>`;
     if (driverPositions === 0) {
         content += `<p style="color:#7f8c8d;">לא הוגדרו עמדות הדורשות נהג. הסד"כ חופשי מאילוצי נהיגה.</p>`;
     } else {
         if (driversCount === 0) {
-            content += `<p style="color:#e74c3c; font-weight:bold;">🚨 שגיאה קריטית: הגדרת משימת נהיגה, אבל יש לך 0 נהגים במצבה! האלגוריתם לא יצליח לשבץ.</p>`;
+            content += `<p style="color:#e74c3c; font-weight:bold;">🚨 שגיאה קריטית: יש עמדת נהיגה, אבל 0 נהגים במצבה!</p>`;
         } else if (driversCount === 1) {
-            content += `<p style="color:#e74c3c; font-weight:bold;">🚨 התראה חמורה: יש לך רק נהג אחד! אי אפשר להחזיק משימה פתוחה 24/7 (בגלל שחובה לתת לו 6 שעות שינה). הלוח יצעק "חסר כוח אדם".</p>`;
-        } else if (driversCount === 2) {
-            content += `<p style="color:#e67e22;">⚠️ יש לך 2 נהגים. כדי לכסות יממה מבלי להפר את חוק ה-6 שעות מנוחה, אתה **חייב** להגדיר את אורך משימת הסיור ל-<strong>6 שעות בדיוק!</strong> (משמרת של 4 או 3 שעות תשבור את רצף השינה שלהם ותייצר חורים בלוח).</p>`;
-        } else if (driversCount === 3) {
-            content += `<p style="color:#27ae60;">✅ יש לך 3 נהגים. מספר אידיאלי למשמרות באורך של <strong>4 שעות</strong> (כל אחד ינהג 4 שעות, וינוח 8 שעות מחוץ להגה).</p>`;
+            content += `<p style="color:#e74c3c; font-weight:bold;">🚨 התראה חמורה: נהג יחיד לא יכול להחזיק משימה 24/7 (חייב 6 שעות שינה).</p>`;
         } else {
-            content += `<p style="color:#27ae60;">✅ יש לך ${driversCount} נהגים. המצבה גמישה ותאפשר משמרות של 2, 3 או 4 שעות ללא שום בעיה תכנונית.</p>`;
+            // המלצה מתמטית מחושבת לנהגים
+            let idealDriverShift = 24 / driversCount;
+            let possibleShifts = [];
+            if (24 % driversCount === 0 && idealDriverShift >= 2 && idealDriverShift <= 8) {
+                content += `<p style="color:#27ae60;">✅ יש לך ${driversCount} נהגים. כדי לייצר סבב נהיגה מושלם (שבו כל נהג עולה פעם ביום ומקבל מקסימום מנוחה רצופה), <strong>הגדר את משמרת הסיור ל-${idealDriverShift} שעות בדיוק.</strong></p>`;
+            } else {
+                content += `<p style="color:#e67e22;">⚠️ יש לך ${driversCount} נהגים. 24 לא מתחלק ב-${driversCount} בצורה מושלמת. מומלץ להשתמש במשמרות של <strong>4 או 3 שעות</strong> ולהיות מוכן לכך שנהגים ישובצו פעמיים ביממה (אך המערכת תגן על 6 שעות השינה שלהם).</p>`;
+            }
         }
     }
 
-    content += `<hr style="border:0; border-top:1px dashed #ccc; margin:20px 0;">`;
-    content += `<h3 style="color:#2c3e50;">🛡️ ניתוח עומס שמירות כללי</h3>`;
-    
-    if (totalSoldiers === 0) {
-        content += `<p style="color:#7f8c8d;">אין חיילים במערכת. הוסף חיילים כדי לחשב עומס.</p>`;
-    } else if (totalReqSoldiers === 0) {
-        content += `<p style="color:#7f8c8d;">לא הוגדרו עמדות. הוסף עמדות לחישוב.</p>`;
+    content += `<h3 style="color:#2c3e50; margin-top:25px;">🛡️ ניתוח עומס והמלצות לשומרים רגילים</h3>`;
+    if (totalSoldiers === 0 || totalReqSoldiers === 0) {
+        content += `<p style="color:#7f8c8d;">חסרים נתונים לחישוב עומס כולל.</p>`;
     } else {
         let totalHoursNeeded = totalReqSoldiers * 24;
         let avgHours = totalHoursNeeded / totalSoldiers;
         
         content += `<ul style="list-style-type: square; color:#34495e;">
-            <li>העמדות דורשות סה"כ <strong>${totalReqSoldiers}</strong> חיילים במקביל מתוך מצבה של <strong>${totalSoldiers}</strong> פנויים.</li>
-            <li>נדרשות <strong>${totalHoursNeeded}</strong> שעות איוש בכל יממה (24 שעות).</li>
+            <li>נדרשות <strong>${totalHoursNeeded}</strong> שעות איוש בכל יממה (על ${totalSoldiers} חיילים פנויים).</li>
             <li>ממוצע מוערך: <strong style="font-size:1.2em;">${avgHours.toFixed(1)} שעות שמירה לחייל</strong> ביממה.</li>
         </ul>`;
         
         if (avgHours > 10) {
             content += `<div style="background:#fadbd8; padding:15px; border-radius:6px; margin-top:10px;">
-                <span style="color:#c0392b; font-weight:bold;">🚨 עומס כבד ובלתי אפשרי!</span><br>
-                החיילים יקרסו ולא יקבלו מספיק מנוחה. חובה לבטל עמדה או לגייס סד"כ נוסף!
+                <span style="color:#c0392b; font-weight:bold;">🚨 עומס כבד ובלתי אפשרי! (מעל 10 שעות לחייל)</span><br>
+                החיילים יקרסו ולא יקבלו מספיק מנוחה. חובה לבטל עמדה או לגייס סד"כ נוסף.
             </div>`;
         } else if (avgHours > 7) {
             content += `<div style="background:#fdebd0; padding:15px; border-radius:6px; margin-top:10px;">
                 <span style="color:#d35400; font-weight:bold;">⚠️ עומס בינוני-גבוה.</span><br>
-                מומלץ לקבוע משכי משמרות של <strong>3 או 4 שעות</strong> בלבד. אם תקבע שעתיים, החיילים יעלו וירדו מעמדות יותר מדי פעמים ביום.
+                <strong>המלצת המערכת:</strong> קבע משמרות ארוכות יותר של <strong>4 או 6 שעות</strong>. אם תקבע שעתיים, החיילים יתזזצו לעלות ולרדת מעמדות 4-5 פעמים ביום וייחנקו.
             </div>`;
         } else {
             content += `<div style="background:#d5f5e3; padding:15px; border-radius:6px; margin-top:10px;">
                 <span style="color:#27ae60; font-weight:bold;">✅ עומס תקין ומרווח.</span><br>
-                המצב מאפשר גמישות רבה. מומלץ לעבוד עם משמרות סטנדרטיות של <strong>שעתיים או 3 שעות</strong> והחיילים יקבלו מנוחה מעולה בין לבין.
+                <strong>המלצת המערכת:</strong> קבע משמרות של <strong>2 או 3 שעות</strong> כדי לאזן נטל ולהעביר את הזמן מהר.
             </div>`;
         }
     }
@@ -381,7 +357,7 @@ function closeAdvisor() {
     document.getElementById('advisor-modal').style.display = 'none';
 }
 
-// ---------------- מנוע בניית הלוח ----------------
+// ---------------- מנוע בניית הלוח החדש - עם מנגנון מניעת פערים! ----------------
 function generateSchedule() {
     if (globalSoldiers.length === 0 || globalPositions.length === 0) return alert("יש להזין לפחות חייל אחד ועמדה אחת כדי לבצע שיבוץ.");
 
@@ -425,11 +401,10 @@ function generateSchedule() {
         
         for (let slot = 0; slot < shift.reqSoldiers; slot++) {
             let isDriverRequiredForThisSlot = (shift.reqDriver && slot === 0); 
-            let validCandidates = [];
+            let tempValid = [];
             
             globalSoldiers.forEach(soldier => {
                 let candidate = soldier.name;
-                
                 if (isDriverRequiredForThisSlot && !soldier.isDriver) return;
                 if (shift.soldiers.includes(candidate)) return;
 
@@ -480,30 +455,52 @@ function generateSchedule() {
                     }
                 }
 
-                validCandidates.push({
+                tempValid.push({
                     name: candidate,
                     totalMs: stats.totalMs,
                     nightMs: stats.nightMs,
-                    lastEnd: effectiveLastEnd
+                    lastEnd: effectiveLastEnd,
+                    isDriver: soldier.isDriver
                 });
             });
             
-            validCandidates.sort((a, b) => {
-                if (shiftNightMs > 0 && (a.nightMs - b.nightMs !== 0)) return a.nightMs - b.nightMs;
-                if (a.totalMs - b.totalMs !== 0) return a.totalMs - b.totalMs;
-                return a.lastEnd - b.lastEnd;
-            });
-            
             let chosen = "חסר כוח אדם!";
-            if (validCandidates.length > 0) {
-                 let winner = validCandidates[0];
-                 chosen = winner.name;
+            if (tempValid.length > 0) {
+                // המנגנון החדש: פיצול למועמדים מועדפים ול"רזרבה חסומה" (כדי למנוע פערי שעות וטחינת נהגים)
+                let minTotalMs = Math.min(...tempValid.map(c => c.totalMs));
+                let preferred = [];
+                let fallback = [];
+
+                tempValid.forEach(c => {
+                    // תנאי 1 להורדה בדרגה: אם המשימה לא דורשת נהג, והחייל הוא נהג! (שומרים עליהם לסיורים)
+                    let isDriverWasted = (!isDriverRequiredForThisSlot && c.isDriver);
+                    // תנאי 2 להורדה בדרגה: אם לחייל יש פער של יותר משעה וחצי מעל החייל עם הכי פחות שעות (מונע חזירים ששואבים משמרות)
+                    let isOverScheduled = (c.totalMs > minTotalMs + 1.5 * 3600000);
+
+                    if (isDriverWasted || isOverScheduled) {
+                        fallback.push(c);
+                    } else {
+                        preferred.push(c);
+                    }
+                });
+
+                let sortFn = (a, b) => {
+                    if (shiftNightMs > 0 && (a.nightMs - b.nightMs !== 0)) return a.nightMs - b.nightMs;
+                    if (a.totalMs - b.totalMs !== 0) return a.totalMs - b.totalMs;
+                    return a.lastEnd - b.lastEnd;
+                };
+                
+                preferred.sort(sortFn);
+                fallback.sort(sortFn);
+
+                let winner = preferred.length > 0 ? preferred[0] : fallback[0];
+                chosen = winner.name;
                  
-                 tempAssignments[chosen].push({start: shift.startMs, end: shift.endMs});
-                 let shiftDurationMs = shift.endMs - shift.startMs;
-                 tempStats[chosen].totalMs += shiftDurationMs;
-                 if (shiftNightMs > 0) tempStats[chosen].nightMs += shiftNightMs;
-                 tempStats[chosen].lastEnd = Math.max(tempStats[chosen].lastEnd, shift.endMs);
+                tempAssignments[chosen].push({start: shift.startMs, end: shift.endMs});
+                let shiftDurationMs = shift.endMs - shift.startMs;
+                tempStats[chosen].totalMs += shiftDurationMs;
+                if (shiftNightMs > 0) tempStats[chosen].nightMs += shiftNightMs;
+                tempStats[chosen].lastEnd = Math.max(tempStats[chosen].lastEnd, shift.endMs);
             }
             shift.soldiers.push(chosen);
         }
