@@ -15,12 +15,12 @@
             <ul>
                 <li id="nav-schedule" class="active" onclick="showSection('schedule')">לוח שמירות</li>
                 <li id="nav-report" onclick="showSection('report')">דו"ח חייל אישי</li>
+                <li id="nav-control" onclick="showSection('control')">בקרה ושאילתות (חדש)</li>
                 <li id="nav-admin" onclick="showSection('admin')">ניהול והגדרות</li>
             </ul>
         </nav>
 
         <main class="content">
-            <!-- לוח שמירות -->
             <div id="schedule-section">
                 <header>
                     <h1>לוח שיבוץ משמרות</h1>
@@ -36,7 +36,7 @@
                         <input type="datetime-local" id="start-time">
                         <span style="margin: 0 15px; font-weight: bold;">עד</span>
                         <input type="datetime-local" id="end-time">
-                        <button class="btn-primary" onclick="renderTable()" style="margin-right: 15px;">עדכן חיתוך</button>
+                        <button class="btn-primary" onclick="renderTable()" style="margin-right: 15px;">עדכן תצוגה</button>
                     </div>
                 </div>
 
@@ -59,14 +59,13 @@
                 </div>
             </div>
 
-            <!-- דו"ח חייל (חדש!) -->
             <div id="report-section" style="display:none;">
                 <header>
                     <h1>דו"ח חייל אישי</h1>
                 </header>
                 
                 <div class="card">
-                    <h3>בחירת חייל </h3>
+                    <h3>בחירת חייל לתחקור</h3>
                     <div class="input-group" style="max-width: 400px;">
                         <select id="report-soldier-select" style="padding: 12px; border: 1px solid #ddd; border-radius: 6px; flex:1;">
                             <option value="">בחר חייל...</option>
@@ -120,7 +119,57 @@
                 </div>
             </div>
 
-            <!-- דף ניהול והגדרות -->
+            <div id="control-section" style="display:none;">
+                <header>
+                    <h1>בקרה, שאילתות והחלפות ידניות</h1>
+                </header>
+
+                <div class="admin-grid">
+                    <div class="card" style="grid-column: 1 / -1; border: 2px solid #3498db;">
+                        <h3 style="color: #2980b9;">החלפת משמרות נקודתית</h3>
+                        <div class="input-group" style="align-items: center; flex-wrap: wrap;">
+                            <select id="swap-soldier-out" onchange="populateSwapShifts()" style="padding: 12px; border: 1px solid #ddd; border-radius: 6px; width: 200px;">
+                                <option value="">1. מי החייל שיורד מהשמירה?</option>
+                            </select>
+                            <span style="font-weight:bold;">&#8592;</span>
+                            <select id="swap-shift-select" style="padding: 12px; border: 1px solid #ddd; border-radius: 6px; flex:1; min-width: 250px;">
+                                <option value="">2. בחר איזו משמרת להעביר...</option>
+                            </select>
+                            <span style="font-weight:bold;">&#8592;</span>
+                            <select id="swap-soldier-in" style="padding: 12px; border: 1px solid #ddd; border-radius: 6px; width: 200px;">
+                                <option value="">3. מי החייל שיעלה במקומו?</option>
+                            </select>
+                            <button onclick="executeSwap()" class="btn-primary" style="background:#2980b9;">בצע החלפה</button>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3>בדיקת הוגנות (ביקורת לוח)</h3>
+                        <button onclick="runFairnessCheck()" class="btn-primary" style="margin-bottom:15px; width:100%;">הרץ סריקת ביקורת</button>
+                        <ul id="fairness-results" style="list-style: none; padding: 0; max-height: 250px; overflow-y: auto; color:#e74c3c; font-weight:bold;">
+                            <li style="color:#7f8c8d; font-weight:normal; font-style:italic;">לחץ על הכפתור כדי לסרוק חריגות...</li>
+                        </ul>
+                    </div>
+
+                    <div class="card table-container">
+                        <h3>טבלת סיכום פלוגתית</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>שם החייל</th>
+                                    <th>מס' משמרות</th>
+                                    <th>שעות שמירה</th>
+                                    <th>שעות לילה (00:00-06:00)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="control-summary-tbody">
+                                <tr><td colspan="4" style="color:#7f8c8d;">יש לייצר לוח כדי לראות נתונים</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <div id="admin-section" style="display:none;">
                 <header>
                     <h1>ניהול כוח אדם ועמדות</h1>
@@ -130,8 +179,11 @@
                 <div class="admin-grid">
                     <div class="card">
                         <h3>הוספת חיילים</h3>
-                        <div class="input-group">
+                        <div class="input-group" style="align-items: center;">
                             <input type="text" id="soldier-name" placeholder="שם החייל...">
+                            <label style="margin:0 10px; cursor:pointer; font-weight:bold;">
+                                <input type="checkbox" id="soldier-is-driver" style="width:auto;"> מוסמך נהג
+                            </label>
                             <button onclick="addSoldier()" class="btn-primary">הוסף</button>
                         </div>
                         <div class="data-lists">
@@ -141,12 +193,17 @@
                     </div>
 
                     <div class="card">
-                        <h3>הוספת עמדות</h3>
-                        <div class="input-group">
-                            <input type="text" id="position-name" placeholder="שם העמדה...">
-                            <input type="number" id="position-duration" placeholder="כמה זמן שמירה" style="width: 140px;">
-                            <input type="number" id="position-req-soldiers" placeholder="כמה חיילים בעמדה/משימה" style="width: 190px;">
-                            <button onclick="addPosition()" class="btn-primary">הוסף</button>
+                        <h3>הוספת עמדות / משימות</h3>
+                        <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;">
+                            <input type="text" id="position-name" placeholder="שם העמדה / משימה...">
+                            <div style="display:flex; gap:10px;">
+                                <input type="number" id="position-duration" placeholder="שעות שמירה" style="width: 100px;">
+                                <input type="number" id="position-req-soldiers" placeholder="כמות חיילים בעמדה" style="width: 160px;">
+                            </div>
+                            <label style="cursor:pointer; font-weight:bold;">
+                                <input type="checkbox" id="position-req-driver" style="width:auto;"> האם דרוש נהג למשימה זו?
+                            </label>
+                            <button onclick="addPosition()" class="btn-primary">הוסף משימה</button>
                         </div>
                         <div class="data-lists">
                             <h4>רשימת עמדות:</h4>
