@@ -21,11 +21,12 @@
         </nav>
 
         <main class="content">
+            <!-- לוח שמירות -->
             <div id="schedule-section">
                 <header>
                     <h1>לוח שיבוץ משמרות</h1>
                     <div>
-                        <button class="btn-generate" onclick="generateSchedule()">צור/עדכן טבלה</button>
+                        <button class="btn-generate" onclick="generateSchedule()">שבץ חיילים אוטומטית</button>
                         <button class="btn-export" onclick="exportToImage()">ייצא לתמונה</button>
                     </div>
                 </header>
@@ -59,6 +60,7 @@
                 </div>
             </div>
 
+            <!-- דו"ח חייל אישי -->
             <div id="report-section" style="display:none;">
                 <header>
                     <h1>דו"ח חייל אישי</h1>
@@ -119,6 +121,7 @@
                 </div>
             </div>
 
+            <!-- בקרה ושאילתות -->
             <div id="control-section" style="display:none;">
                 <header>
                     <h1>בקרה, שאילתות והחלפות ידניות</h1>
@@ -160,20 +163,25 @@
                                     <th>מס' משמרות</th>
                                     <th>שעות שמירה</th>
                                     <th>שעות לילה (00:00-06:00)</th>
+                                    <th>שעות תורנות/חריגים</th>
                                 </tr>
                             </thead>
                             <tbody id="control-summary-tbody">
-                                <tr><td colspan="4" style="color:#7f8c8d;">יש לייצר לוח כדי לראות נתונים</td></tr>
+                                <tr><td colspan="5" style="color:#7f8c8d;">יש לייצר לוח כדי לראות נתונים</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
+            <!-- דף ניהול והגדרות -->
             <div id="admin-section" style="display:none;">
-                <header>
+                <header style="display:flex; justify-content:space-between; align-items:center;">
                     <h1>ניהול כוח אדם ועמדות</h1>
-                    <button class="btn-danger" onclick="resetSystem()">איפוס כל הנתונים</button>
+                    <div>
+                        <button class="btn-primary" style="background:#8e44ad; margin-left:10px;" onclick="openAdvisor()">🧠 יועץ תכנון חכם</button>
+                        <button class="btn-danger" onclick="resetSystem()">איפוס כל הנתונים</button>
+                    </div>
                 </header>
                 
                 <div class="admin-grid">
@@ -235,6 +243,19 @@
             </div>
         </main>
     </div>
+
+    <!-- מודל היועץ החכם (קופץ מעל המסך) -->
+    <div id="advisor-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; justify-content:center; align-items:center;">
+        <div class="card" style="max-width:650px; width:90%; position:relative; background:#fff; padding:30px; border-radius:10px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+            <button onclick="closeAdvisor()" style="position:absolute; top:15px; left:15px; background:none; border:none; font-size:2em; cursor:pointer; color:#e74c3c; line-height:1;">&times;</button>
+            <h2 style="color:#8e44ad; margin-top:0; border-bottom:2px solid #8e44ad; padding-bottom:10px;">🧠 יועץ תכנון סד"כ</h2>
+            <div id="advisor-content" style="line-height:1.6; font-size:1.1em; max-height: 60vh; overflow-y: auto; padding-left: 10px;">
+                <!-- התוכן יוזרק כאן על ידי ה-JS -->
+            </div>
+            <button onclick="closeAdvisor()" class="btn-primary" style="margin-top:20px; width:100%; background:#8e44ad;">הבנתי, סגור חלונית</button>
+        </div>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html>
