@@ -2,8 +2,8 @@ let isScheduleGenerated = false;
 let globalSoldiers = [];
 let globalPositions = [];
 let globalExceptions = []; 
+let globalSoldierShifts = {}; // זיכרון חדש עבור הדו"ח האישי
 
-// חוק קשיח מס' 2: שעתיים מנוחה מינימום ללא פשרות (מונע רצף)
 const MIN_REST_MS = 2 * 60 * 60 * 1000; 
 
 window.onload = () => {
@@ -32,8 +32,11 @@ window.onload = () => {
 function showSection(id) {
     document.getElementById('schedule-section').style.display = id === 'schedule' ? 'block' : 'none';
     document.getElementById('admin-section').style.display = id === 'admin' ? 'block' : 'none';
+    document.getElementById('report-section').style.display = id === 'report' ? 'block' : 'none';
+    
     document.getElementById('nav-schedule').classList.toggle('active', id === 'schedule');
     document.getElementById('nav-admin').classList.toggle('active', id === 'admin');
+    document.getElementById('nav-report').classList.toggle('active', id === 'report');
 }
 
 function loadDataFromStorage() {
@@ -62,15 +65,19 @@ function updateUI() {
 
     const sList = document.getElementById('admin-soldiers-list');
     const excSoldierSelect = document.getElementById('exception-soldier');
+    const repSoldierSelect = document.getElementById('report-soldier-select'); // תפריט הדו"ח
     
-    if (sList && excSoldierSelect) {
+    if (sList && excSoldierSelect && repSoldierSelect) {
         excSoldierSelect.innerHTML = '<option value="">בחר חייל...</option>';
+        repSoldierSelect.innerHTML = '<option value="">בחר חייל...</option>';
+        
         if (globalSoldiers.length === 0) {
             sList.innerHTML = '<li style="color: #95a5a6; font-style: italic;">אין חיילים במערכת</li>';
         } else {
             sList.innerHTML = globalSoldiers.map((s, idx) => `<li><span style="display:inline-block; width:20px; font-weight:bold;">${idx + 1}.</span> ${s.name} <button onclick="deleteSoldier(${s.id})" style="background:none; color:red; border:none; padding:0 10px; font-size:0.9em; cursor:pointer; margin-right:auto;">(הסר)</button></li>`).join('');
             globalSoldiers.forEach(s => {
                 excSoldierSelect.innerHTML += `<option value="${s.name}">${s.name}</option>`;
+                repSoldierSelect.innerHTML += `<option value="${s.name}">${s.name}</option>`;
             });
         }
     }
@@ -228,6 +235,10 @@ function renderTable() {
 
     thead.innerHTML = '';
     tbody.innerHTML = '';
+    
+    // אתחול זיכרון הדו"ח
+    globalSoldierShifts = {};
+    globalSoldiers.forEach(s => globalSoldierShifts[s.name] = []);
 
     if (globalPositions.length === 0) {
         thead.innerHTML = '<tr><th>סטטוס</th></tr>';
@@ -236,7 +247,6 @@ function renderTable() {
     }
 
     let headerTr = document.createElement('tr');
-    
     let thDay = document.createElement('th');
     thDay.innerText = 'יום';
     thDay.style.width = '80px';
@@ -283,8 +293,6 @@ function renderTable() {
     globalPositions.forEach(pos => { assignments[pos.id] = []; });
     
     let soldierAssignments = {};
-    
-    // ניהול "בנקי שעות" לאיזון עומס - חוקים 3 ו-4
     let soldierStats = {}; 
     
     globalSoldiers.forEach(s => { 
@@ -295,22 +303,17 @@ function renderTable() {
     allShifts.forEach(shift => {
         let assignedList = []; 
         let shiftHour = new Date(shift.startMs).getHours();
-        
-        // הגדרת משמרת לילה: מתחילה בין 22:00 ל-05:59 בבוקר
         let isNightShift = (shiftHour >= 22 || shiftHour < 6);
+        let currentPosName = globalPositions.find(p => p.id === shift.posId)?.name || "משמרת";
         
         if (isScheduleGenerated && globalSoldiers.length > 0) {
             for (let slot = 0; slot < shift.reqSoldiers; slot++) {
-                
                 let validCandidates = [];
                 
                 globalSoldiers.forEach(soldier => {
                     let candidate = soldier.name;
-                    
-                    // בדיקה האם כבר מאייש עמדה אחרת בדיוק באותה השעה
                     if (assignedList.includes(candidate)) return;
 
-                    // חוק 1 (קשיח): חריגים ומחוץ למצבה
                     let isExcluded = false;
                     for (let exc of globalExceptions) {
                         if (exc.soldierName === candidate) {
@@ -322,7 +325,6 @@ function renderTable() {
                     }
                     if (isExcluded) return; 
 
-                    // חוק 2 (קשיח): האם נח מספיק? מונע רצפים
                     let hasSufficientRest = true;
                     for (let existingShift of soldierAssignments[candidate]) {
                         if (Math.max(shift.startMs, existingShift.start - MIN_REST_MS) < Math.min(shift.endMs, existingShift.end + MIN_REST_MS)) {
@@ -331,7 +333,6 @@ function renderTable() {
                         }
                     }
                     
-                    // בדיקת מנוחה גם למול חריגים (למשל: לא יעלה שמירה מיד כשיורד ממטבח)
                     if (hasSufficientRest) {
                         for (let exc of globalExceptions) {
                             if (exc.soldierName === candidate) {
@@ -343,13 +344,11 @@ function renderTable() {
                         }
                     }
                     
-                    // אם אין מנוחה חוקית, הוא נפסל מלהיות מועמד (יוצג "חסר כוח אדם!" אם כולם נפסלים)
                     if (!hasSufficientRest) return;
                     
                     let stats = soldierStats[candidate];
                     let effectiveLastEnd = stats.lastEnd;
                     
-                    // מוודא שה"מנוחה" מחושבת גם מסיום התורנות ולא רק משמירות
                     for (let exc of globalExceptions) {
                         if (exc.soldierName === candidate && exc.endMs <= shift.startMs && exc.endMs > effectiveLastEnd) {
                             effectiveLastEnd = exc.endMs;
@@ -364,19 +363,13 @@ function renderTable() {
                     });
                 });
                 
-                // מיון המועמדים התקינים לפי הוגנות עומס (חוקים 3 ו-4)
                 validCandidates.sort((a, b) => {
-                    // א. איזון לילות: אם זו משמרת לילה, קודם כל נבדוק למי יש פחות שעות לילה במצטבר
                     if (isNightShift) {
                         let nightDiff = a.nightMs - b.nightMs;
                         if (nightDiff !== 0) return nightDiff; 
                     }
-                    
-                    // ב. איזון כללי: למי יש פחות שעות שמירה כלליות במצטבר
                     let totalDiff = a.totalMs - b.totalMs;
                     if (totalDiff !== 0) return totalDiff;
-                    
-                    // ג. שובר שוויון: מי שהמשמרת/תורנות האחרונה שלו הסתיימה הכי מזמן (נח הכי הרבה)
                     return a.lastEnd - b.lastEnd;
                 });
                 
@@ -385,12 +378,14 @@ function renderTable() {
                      let winner = validCandidates[0];
                      chosen = winner.name;
                      
-                     // עדכון בנקי השעות לאחר שיבוץ מוצלח
                      soldierAssignments[chosen].push({start: shift.startMs, end: shift.endMs});
                      let shiftDurationMs = shift.endMs - shift.startMs;
                      soldierStats[chosen].totalMs += shiftDurationMs;
                      if (isNightShift) soldierStats[chosen].nightMs += shiftDurationMs;
                      soldierStats[chosen].lastEnd = Math.max(soldierStats[chosen].lastEnd, shift.endMs);
+                     
+                     // שמירת הנתון לטובת דו"ח החייל מבוקש
+                     globalSoldierShifts[chosen].push({ posName: currentPosName, start: shift.startMs, end: shift.endMs });
                 }
                 assignedList.push(chosen);
             }
@@ -488,6 +483,82 @@ function renderTable() {
 
         tbody.appendChild(tr);
         curTime = nextTime;
+    }
+}
+
+// פונקציה חדשה להפקת דו"ח חייל
+function generateSoldierReport() {
+    if (!isScheduleGenerated) {
+        alert("יש לשבץ חיילים (לייצר לוח) לפני הפקת דו\"ח.");
+        return;
+    }
+
+    const soldierName = document.getElementById('report-soldier-select').value;
+    if (!soldierName) {
+        alert("נא לבחור חייל מהרשימה.");
+        return;
+    }
+
+    document.getElementById('report-results').style.display = 'block';
+
+    // טיפול בטבלת המשמרות
+    let shifts = globalSoldierShifts[soldierName] || [];
+    shifts.sort((a, b) => a.start - b.start);
+
+    let totalHours = 0;
+    let tbody = document.getElementById('report-shifts-tbody');
+    tbody.innerHTML = '';
+
+    if (shifts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="color:#7f8c8d; padding:20px;">אין משמרות לחייל זה בלוח הנוכחי</td></tr>';
+    } else {
+        shifts.forEach((s, idx) => {
+            let sDate = new Date(s.start);
+            let eDate = new Date(s.end);
+            let duration = (s.end - s.start) / 3600000;
+            totalHours += duration;
+
+            let restStr = '<span style="color:#bdc3c7;">משמרת אחרונה בלוח</span>';
+            if (idx < shifts.length - 1) {
+                let nextS = shifts[idx+1];
+                let restHours = (nextS.start - s.end) / 3600000;
+                restStr = `<strong>${restHours}</strong> שעות`;
+            }
+
+            let timeStr = `${sDate.getDate()}/${sDate.getMonth()+1} ${sDate.getHours().toString().padStart(2,'0')}:00 - ${eDate.getHours().toString().padStart(2,'0')}:00`;
+
+            tbody.innerHTML += `<tr>
+                <td style="font-weight:bold;">${s.posName}</td>
+                <td dir="ltr">${timeStr}</td>
+                <td>${duration} ש'</td>
+                <td style="color:#27ae60;">${restStr}</td>
+            </tr>`;
+        });
+    }
+
+    document.getElementById('report-total-shifts').innerText = shifts.length;
+    document.getElementById('report-total-hours').innerText = totalHours;
+
+    // טיפול בטבלת החריגים
+    let exc = globalExceptions.filter(e => e.soldierName === soldierName);
+    let excTbody = document.getElementById('report-exc-tbody');
+    excTbody.innerHTML = '';
+
+    if (exc.length === 0) {
+         excTbody.innerHTML = '<tr><td colspan="3" style="color:#7f8c8d; padding:20px;">אין (חייל זמין לחלוטין למצבה)</td></tr>';
+    } else {
+        exc.forEach(e => {
+            let sDate = new Date(e.startMs);
+            let eDate = new Date(e.endMs);
+            let sStr = `${sDate.getDate()}/${sDate.getMonth()+1} ${sDate.getHours().toString().padStart(2,'0')}:${sDate.getMinutes().toString().padStart(2,'0')}`;
+            let eStr = `${eDate.getDate()}/${eDate.getMonth()+1} ${eDate.getHours().toString().padStart(2,'0')}:${eDate.getMinutes().toString().padStart(2,'0')}`;
+
+            excTbody.innerHTML += `<tr>
+                <td style="font-weight:bold; color:#d35400;">${e.type}</td>
+                <td dir="ltr">${sStr}</td>
+                <td dir="ltr">${eStr}</td>
+            </tr>`;
+        });
     }
 }
 
