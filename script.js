@@ -677,53 +677,72 @@ function executeSwap() {
 }
 
 function runFairnessCheck() {
-    const resultsUl = document.getElementById('fairness-results'); resultsUl.innerHTML = ''; let issuesFound = 0;
+    const resultsUl = document.getElementById('fairness-results'); 
+    resultsUl.innerHTML = ''; 
+    let issuesFound = 0;
+
+    if (!isScheduleGenerated || globalSoldiers.length === 0) {
+        resultsUl.innerHTML = '<li style="color:#7f8c8d; font-weight:normal; font-style:italic;">אין נתוני לוח לסריקה. יש לשבץ חיילים קודם.</li>';
+        return;
+    }
+
+    // חישוב ממוצעים פלוגתיים מדויקים
     let totalHoursArr = globalSoldiers.map(s => globalStats[s.name].totalMs / 3600000);
-    let avgHours = totalHoursArr.reduce((a, b) => a + b, 0) / (totalHoursArr.length || 1);
+    let avgHours = totalHoursArr.reduce((a, b) => a + b, 0) / (globalSoldiers.length || 1);
+
     let totalShiftsArr = globalSoldiers.map(s => globalStats[s.name].shiftsCount);
-    let avgShifts = totalShiftsArr.reduce((a, b) => a + b, 0) / (totalSoldiers.length || 1);
+    let avgShifts = totalShiftsArr.reduce((a, b) => a + b, 0) / (globalSoldiers.length || 1);
 
     globalSoldiers.forEach(s => {
-        let stats = globalStats[s.name]; let hours = stats.totalMs / 3600000;
-       if (Math.abs(hours - avgHours) >= 1.5) {
-            // חישוב ההפרשים מהממוצע
+        let stats = globalStats[s.name]; 
+        let hours = stats.totalMs / 3600000;
+        
+        // 1. בדיקת פער שעות ומספר משמרות מהממוצע בניסוח המבוקש
+        if (Math.abs(hours - avgHours) >= 1.5) {
             let shiftsDiff = stats.shiftsCount - avgShifts;
             let hoursDiff = hours - avgHours;
 
-            // עיבוד פרמטר Y (כמות שמירות וכיוון)
             let absShifts = Math.abs(shiftsDiff).toFixed(1);
             if (absShifts.endsWith('.0')) absShifts = Math.floor(Math.abs(shiftsDiff)).toString();
             let yWord = (absShifts === "1") ? "שמירה אחת" : `${absShifts} שמירות`;
             let yDirection = shiftsDiff >= 0 ? "יותר" : "פחות";
 
-            // עיבוד פרמטר Z (כמות שעות וכיוון)
             let zText = Math.abs(hoursDiff).toFixed(1);
             if (zText.endsWith('.0')) zText = Math.floor(Math.abs(hoursDiff)).toString();
             let zDirection = hoursDiff >= 0 ? "יותר" : "פחות";
 
-            // עיבוד פרמטר R (האם נהג או חייל רגיל)
             let rText = s.isDriver ? "נהג 🚗" : "חייל רגיל 👤";
 
-            // הזרקת הניסוח החדש המבוקש
             resultsUl.innerHTML += `<li>⚠️ ${s.name} שומר ${yWord} ${yDirection}, וסה"כ ${zText} שעות ${zDirection} מהממוצע - ${rText}</li>`;
             issuesFound++;
         }
+
+        // 2. בדיקת רצפי שמירה (מנוחה קשיחה של שעתיים)
         let sortedAssignments = [...stats.assignments].sort((a,b) => a.start - b.start);
         for (let i = 0; i < sortedAssignments.length - 1; i++) {
             let gap = (sortedAssignments[i+1].start - sortedAssignments[i].end) / 3600000;
-            if (gap < 2) { resultsUl.innerHTML += `<li>🚨 מנוחה קצרה: ${s.name} נח רק ${gap} שעות בין משמרות.</li>`; issuesFound++; }
+            if (gap < 2) {
+                resultsUl.innerHTML += `<li>🚨 מנוחה קצרה: ${s.name} נח רק ${gap} שעות בין משמרות.</li>`;
+                issuesFound++;
+            }
         }
         
+        // 3. בדיקת התנגשות חריגים (מטבח/בית)
         globalExceptions.forEach(exc => {
             if(exc.soldierName === s.name) {
                 sortedAssignments.forEach(asg => {
-                    if (Math.max(asg.start, exc.startMs) < Math.min(asg.end, exc.endMs)) { resultsUl.innerHTML += `<li>❌ התנגשות קריטית: ${s.name} משובץ למשמרת בזמן שהוא מוגדר ב${exc.type}!</li>`; issuesFound++; }
+                    if (Math.max(asg.start, exc.startMs) < Math.min(asg.end, exc.endMs)) {
+                        resultsUl.innerHTML += `<li>❌ התנגשות קריטית: ${s.name} משובץ למשמרת בזמן שהוא מוגדר ב${exc.type}!</li>`;
+                        issuesFound++;
+                    }
                 });
             }
         });
     });
 
-    if (issuesFound === 0) resultsUl.innerHTML = '<li style="color:#27ae60;">✅ הלוח תקין, מאוזן והוגן לחלוטין. לא נמצאו חריגות.</li>';
+    if (issuesFound === 0) {
+        resultsUl.innerHTML = '<li style="color:#27ae60;">✅ הלוח תקין, מאוזן והוגן לחלוטין. לא נמצאו חריגות.</li>';
+    }
 }
 
 function generateSoldierReport() {
