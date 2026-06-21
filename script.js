@@ -6,6 +6,10 @@ let globalExceptions = [];
 let globalSchedule = []; 
 let globalStats = {}; 
 
+// משתנים למעקב אחרי מצב עריכה
+let editingSoldierId = null;
+let editingPositionId = null;
+
 const MIN_REST_MS = 2 * 60 * 60 * 1000; 
 const DRIVER_SLEEP_MS = 6 * 60 * 60 * 1000; 
 
@@ -37,7 +41,10 @@ window.onload = () => {
     if(excStartInput) excStartInput.value = start.toISOString().slice(0, 16);
     if(excEndInput) excEndInput.value = new Date(start.getTime() + 6 * 60 * 60 * 1000).toISOString().slice(0, 16); 
     
-    document.getElementById('soldier-name')?.addEventListener('keypress', e => { if (e.key === 'Enter') addSoldier(); });
+    document.getElementById('soldier-name')?.addEventListener('keypress', e => { if (e.key === 'Enter') saveSoldier(); });
+    document.getElementById('position-name')?.addEventListener('keypress', e => { if (e.key === 'Enter') savePosition(); });
+    document.getElementById('position-duration')?.addEventListener('keypress', e => { if (e.key === 'Enter') savePosition(); });
+    document.getElementById('position-req-soldiers')?.addEventListener('keypress', e => { if (e.key === 'Enter') savePosition(); });
     
     loadDataFromStorage();
 };
@@ -106,7 +113,12 @@ function updateUI() {
         } else {
             sList.innerHTML = globalSoldiers.map((s, idx) => {
                 let driverTag = s.isDriver ? ' <span style="color:#2980b9; font-size:0.85em; font-weight:bold;">[נהג]</span>' : '';
-                return `<li><span style="display:inline-block; width:20px; font-weight:bold;">${idx + 1}.</span> ${s.name} ${driverTag} <button onclick="deleteSoldier(${s.id})" style="background:none; color:red; border:none; padding:0 10px; font-size:0.9em; cursor:pointer; margin-right:auto;">(הסר)</button></li>`;
+                return `<li><span style="display:inline-block; width:20px; font-weight:bold;">${idx + 1}.</span> ${s.name} ${driverTag} 
+                    <div style="margin-right:auto; display:flex; gap:5px;">
+                        <button onclick="editSoldier(${s.id})" style="background:none; color:#f39c12; border:none; padding:0 5px; font-size:0.9em; cursor:pointer;">(ערוך)</button>
+                        <button onclick="deleteSoldier(${s.id})" style="background:none; color:red; border:none; padding:0 5px; font-size:0.9em; cursor:pointer;">(הסר)</button>
+                    </div>
+                </li>`;
             }).join('');
             globalSoldiers.forEach(s => {
                 excSoldierSelect.innerHTML += `<option value="${s.name}">${s.name}</option>`;
@@ -121,7 +133,12 @@ function updateUI() {
         else {
             pList.innerHTML = globalPositions.map((p, idx) => {
                 let driverTag = p.reqDriver ? ' <span style="color:#2980b9; font-size:0.85em; font-weight:bold;">[דורש נהג]</span>' : '';
-                return `<li><span style="display:inline-block; width:20px; font-weight:bold;">${idx + 1}.</span> ${p.name} ${driverTag} <span style="color:#7f8c8d; font-size:0.9em; margin-right:5px;">(${p.duration} שעות | ${p.reqSoldiers} חיילים)</span> <button onclick="deletePosition(${p.id})" style="background:none; color:red; border:none; padding:0 10px; font-size:0.9em; cursor:pointer; margin-right:auto;">(הסר)</button></li>`;
+                return `<li><span style="display:inline-block; width:20px; font-weight:bold;">${idx + 1}.</span> ${p.name} ${driverTag} <span style="color:#7f8c8d; font-size:0.9em; margin-right:5px;">(${p.duration} שעות | ${p.reqSoldiers} חיילים)</span> 
+                    <div style="margin-right:auto; display:flex; gap:5px;">
+                        <button onclick="editPosition(${p.id})" style="background:none; color:#f39c12; border:none; padding:0 5px; font-size:0.9em; cursor:pointer;">(ערוך)</button>
+                        <button onclick="deletePosition(${p.id})" style="background:none; color:red; border:none; padding:0 5px; font-size:0.9em; cursor:pointer;">(הסר)</button>
+                    </div>
+                </li>`;
             }).join('');
         }
     }
@@ -143,17 +160,60 @@ function updateUI() {
     }
 }
 
-function addSoldier() {
+// ---- פונקציות עריכה לחיילים ----
+function editSoldier(id) {
+    const soldier = globalSoldiers.find(s => s.id === id);
+    if (!soldier) return;
+    document.getElementById('soldier-name').value = soldier.name;
+    document.getElementById('soldier-is-driver').checked = soldier.isDriver;
+    editingSoldierId = id;
+    
+    const btn = document.getElementById('btn-save-soldier');
+    if(btn) {
+        btn.innerText = 'שמור שינויים';
+        btn.style.background = '#f39c12';
+    }
+}
+
+function saveSoldier() {
     const input = document.getElementById('soldier-name');
     const isDriverInput = document.getElementById('soldier-is-driver');
     const val = input.value.trim();
     if (!val) return;
     
-    if (globalSoldiers.some(s => s.name === val)) return alert("שגיאה: חייל בשם הזה כבר קיים במערכת!");
+    if (editingSoldierId) {
+        if (globalSoldiers.some(s => s.name === val && s.id !== editingSoldierId)) {
+            return alert("שגיאה: חייל בשם הזה כבר קיים במערכת!");
+        }
+        let soldier = globalSoldiers.find(s => s.id === editingSoldierId);
+        let oldName = soldier.name;
+        soldier.name = val;
+        soldier.isDriver = isDriverInput.checked;
+        
+        // עדכון חריגים אם השם שונה
+        if (oldName !== val) {
+            globalExceptions.forEach(e => {
+                if (e.soldierName === oldName) e.soldierName = val;
+            });
+            isScheduleGenerated = false; 
+        } else if (soldier.isDriver !== isDriverInput.checked) {
+            isScheduleGenerated = false; 
+        }
+        
+        editingSoldierId = null;
+        const btn = document.getElementById('btn-save-soldier');
+        if(btn) {
+            btn.innerText = 'הוסף';
+            btn.style.background = '';
+        }
+    } else {
+        if (globalSoldiers.some(s => s.name === val)) return alert("שגיאה: חייל בשם הזה כבר קיים במערכת!");
+        globalSoldiers.push({ id: Date.now(), name: val, isDriver: isDriverInput.checked });
+        isScheduleGenerated = false;
+    }
     
-    globalSoldiers.push({ id: Date.now(), name: val, isDriver: isDriverInput.checked });
     saveDataToStorage();
-    input.value = ''; isDriverInput.checked = false; isScheduleGenerated = false;
+    input.value = ''; isDriverInput.checked = false; 
     updateUI(); input.focus();
 }
 
@@ -164,7 +224,24 @@ function deleteSoldier(id) {
     saveDataToStorage(); isScheduleGenerated = false; updateUI();
 }
 
-function addPosition() {
+// ---- פונקציות עריכה לעמדות ----
+function editPosition(id) {
+    const pos = globalPositions.find(p => p.id === id);
+    if (!pos) return;
+    document.getElementById('position-name').value = pos.name;
+    document.getElementById('position-duration').value = pos.duration;
+    document.getElementById('position-req-soldiers').value = pos.reqSoldiers;
+    document.getElementById('position-req-driver').checked = pos.reqDriver;
+    editingPositionId = id;
+    
+    const btn = document.getElementById('btn-save-position');
+    if(btn) {
+        btn.innerText = 'שמור שינויים';
+        btn.style.background = '#f39c12';
+    }
+}
+
+function savePosition() {
     const nameInput = document.getElementById('position-name');
     const durInput = document.getElementById('position-duration');
     const reqInput = document.getElementById('position-req-soldiers');
@@ -176,7 +253,23 @@ function addPosition() {
     
     if (!name) return;
     
-    globalPositions.push({ id: Date.now(), name: name, duration: dur, reqSoldiers: req, reqDriver: reqDriverInput.checked });
+    if (editingPositionId) {
+        let pos = globalPositions.find(p => p.id === editingPositionId);
+        pos.name = name;
+        pos.duration = dur;
+        pos.reqSoldiers = req;
+        pos.reqDriver = reqDriverInput.checked;
+        
+        editingPositionId = null;
+        const btn = document.getElementById('btn-save-position');
+        if(btn) {
+            btn.innerText = 'הוסף משימה';
+            btn.style.background = '';
+        }
+    } else {
+        globalPositions.push({ id: Date.now(), name: name, duration: dur, reqSoldiers: req, reqDriver: reqDriverInput.checked });
+    }
+    
     saveDataToStorage();
     nameInput.value = ''; durInput.value = ''; reqInput.value = ''; reqDriverInput.checked = false;
     isScheduleGenerated = false; updateUI(); nameInput.focus();
@@ -211,6 +304,7 @@ function deleteException(id) {
 function resetSystem() {
     if (confirm("פעולה זו תמחק לחלוטין את כל הנתונים. האם להמשיך?")) {
         globalSoldiers = []; globalPositions = []; globalExceptions = []; globalSchedule = [];
+        editingSoldierId = null; editingPositionId = null;
         localStorage.clear(); isScheduleGenerated = false; updateUI();
     }
 }
