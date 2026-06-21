@@ -215,7 +215,7 @@ function resetSystem() {
     }
 }
 
-// ---------------- יועץ תכנון חכם (החדש!) ----------------
+// ---------------- יועץ תכנון חכם ----------------
 function openAdvisor() {
     let driversCount = globalSoldiers.filter(s => s.isDriver).length;
     let totalSoldiers = globalSoldiers.length;
@@ -234,11 +234,11 @@ function openAdvisor() {
         if (driversCount === 0) {
             content += `<p style="color:#e74c3c; font-weight:bold;">🚨 שגיאה קריטית: הגדרת משימת נהיגה, אבל יש לך 0 נהגים במצבה! האלגוריתם לא יצליח לשבץ.</p>`;
         } else if (driversCount === 1) {
-            content += `<p style="color:#e74c3c; font-weight:bold;">🚨 התראה חמורה: יש לך רק נהג אחד! אי אפשר להחזיק סיור פתוח 24/7 (בגלל שחובה לתת לו 6 שעות שינה). הלוח יצעק "חסר כוח אדם".</p>`;
+            content += `<p style="color:#e74c3c; font-weight:bold;">🚨 התראה חמורה: יש לך רק נהג אחד! אי אפשר להחזיק משימה פתוחה 24/7 (בגלל שחובה לתת לו 6 שעות שינה). הלוח יצעק "חסר כוח אדם".</p>`;
         } else if (driversCount === 2) {
             content += `<p style="color:#e67e22;">⚠️ יש לך 2 נהגים. כדי לכסות יממה מבלי להפר את חוק ה-6 שעות מנוחה, אתה **חייב** להגדיר את אורך משימת הסיור ל-<strong>6 שעות בדיוק!</strong> (משמרת של 4 או 3 שעות תשבור את רצף השינה שלהם ותייצר חורים בלוח).</p>`;
         } else if (driversCount === 3) {
-            content += `<p style="color:#27ae60;">✅ יש לך 3 נהגים. מספר אידיאלי למשמרות סיור באורך של <strong>4 שעות</strong> (כל אחד ינהג 4 שעות, וינוח 8 שעות מחוץ להגה).</p>`;
+            content += `<p style="color:#27ae60;">✅ יש לך 3 נהגים. מספר אידיאלי למשמרות באורך של <strong>4 שעות</strong> (כל אחד ינהג 4 שעות, וינוח 8 שעות מחוץ להגה).</p>`;
         } else {
             content += `<p style="color:#27ae60;">✅ יש לך ${driversCount} נהגים. המצבה גמישה ותאפשר משמרות של 2, 3 או 4 שעות ללא שום בעיה תכנונית.</p>`;
         }
