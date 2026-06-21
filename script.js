@@ -697,23 +697,23 @@ function runFairnessCheck() {
         let stats = globalStats[s.name]; 
         let hours = stats.totalMs / 3600000;
         
-        // 1. בדיקת פער שעות ומספר משמרות מהממוצע בניסוח המבוקש
+       // 1. בדיקת פער שעות ומספר משמרות מהממוצע
         if (Math.abs(hours - avgHours) >= 1.5) {
-            let shiftsDiff = stats.shiftsCount - avgShifts;
             let hoursDiff = hours - avgHours;
 
-            let absShifts = Math.abs(shiftsDiff).toFixed(1);
-            if (absShifts.endsWith('.0')) absShifts = Math.floor(Math.abs(shiftsDiff)).toString();
-            let yWord = (absShifts === "1") ? "שמירה אחת" : `${absShifts} שמירות`;
-            let yDirection = shiftsDiff >= 0 ? "יותר" : "פחות";
-
+            // עיבוד פרמטר Z (כמות שעות וכיוון)
             let zText = Math.abs(hoursDiff).toFixed(1);
             if (zText.endsWith('.0')) zText = Math.floor(Math.abs(hoursDiff)).toString();
             let zDirection = hoursDiff >= 0 ? "יותר" : "פחות";
 
+            // עיבוד פרמטר Y (כמות שמירות בפועל כדי למנוע עשרוני מוזר)
+            let yWord = stats.shiftsCount === 1 ? "שמירה אחת" : `${stats.shiftsCount} שמירות`;
+
+            // עיבוד פרמטר R
             let rText = s.isDriver ? "נהג 🚗" : "חייל רגיל 👤";
 
-            resultsUl.innerHTML += `<li>⚠️ ${s.name} שומר ${yWord} ${yDirection}, וסה"כ ${zText} שעות ${zDirection} מהממוצע - ${rText}</li>`;
+            // הזרקת הניסוח הנקי וההגיוני
+            resultsUl.innerHTML += `<li>⚠️ <strong>${s.name}</strong> ביצע ${yWord} (סה"כ ${hours} שעות), שזה ${zText} שעות ${zDirection} מהממוצע - ${rText}</li>`;
             issuesFound++;
         }
 
