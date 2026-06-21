@@ -21,12 +21,11 @@
         </nav>
 
         <main class="content">
-            <!-- לוח שמירות -->
             <div id="schedule-section">
                 <header>
                     <h1>לוח שיבוץ משמרות</h1>
                     <div>
-                        <button class="btn-generate" onclick="generateSchedule()">צור/עדכן טבלה</button>
+                        <button class="btn-generate" onclick="generateSchedule()">שבץ חיילים אוטומטית</button>
                         <button class="btn-export" onclick="exportToImage()">ייצא לתמונה</button>
                     </div>
                 </header>
@@ -60,14 +59,13 @@
                 </div>
             </div>
 
-            <!-- דו"ח חייל אישי -->
             <div id="report-section" style="display:none;">
                 <header>
                     <h1>דו"ח חייל אישי</h1>
                 </header>
                 
                 <div class="card">
-                    <h3>בחירת חייל </h3>
+                    <h3>בחירת חייל לתחקור</h3>
                     <div class="input-group" style="max-width: 400px;">
                         <select id="report-soldier-select" style="padding: 12px; border: 1px solid #ddd; border-radius: 6px; flex:1;">
                             <option value="">בחר חייל...</option>
@@ -121,7 +119,6 @@
                 </div>
             </div>
 
-            <!-- בקרה ושאילתות -->
             <div id="control-section" style="display:none;">
                 <header>
                     <h1>בקרה, שאילתות והחלפות ידניות</h1>
@@ -174,7 +171,6 @@
                 </div>
             </div>
 
-            <!-- דף ניהול והגדרות -->
             <div id="admin-section" style="display:none;">
                 <header style="display:flex; justify-content:space-between; align-items:center;">
                     <h1>ניהול כוח אדם ועמדות</h1>
@@ -192,7 +188,7 @@
                             <label style="margin:0 10px; cursor:pointer; font-weight:bold;">
                                 <input type="checkbox" id="soldier-is-driver" style="width:auto;"> מוסמך נהג
                             </label>
-                            <button onclick="addSoldier()" class="btn-primary">הוסף</button>
+                            <button id="btn-save-soldier" onclick="saveSoldier()" class="btn-primary">הוסף</button>
                         </div>
                         <div class="data-lists">
                             <h4>רשימת חיילים:</h4>
@@ -211,7 +207,7 @@
                             <label style="cursor:pointer; font-weight:bold;">
                                 <input type="checkbox" id="position-req-driver" style="width:auto;"> האם דרוש נהג למשימה זו?
                             </label>
-                            <button onclick="addPosition()" class="btn-primary">הוסף משימה</button>
+                            <button id="btn-save-position" onclick="savePosition()" class="btn-primary">הוסף משימה</button>
                         </div>
                         <div class="data-lists">
                             <h4>רשימת עמדות:</h4>
@@ -244,13 +240,11 @@
         </main>
     </div>
 
-    <!-- מודל היועץ החכם (קופץ מעל המסך) -->
     <div id="advisor-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:1000; justify-content:center; align-items:center;">
         <div class="card" style="max-width:650px; width:90%; position:relative; background:#fff; padding:30px; border-radius:10px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
             <button onclick="closeAdvisor()" style="position:absolute; top:15px; left:15px; background:none; border:none; font-size:2em; cursor:pointer; color:#e74c3c; line-height:1;">&times;</button>
             <h2 style="color:#8e44ad; margin-top:0; border-bottom:2px solid #8e44ad; padding-bottom:10px;">🧠 יועץ תכנון סד"כ</h2>
             <div id="advisor-content" style="line-height:1.6; font-size:1.1em; max-height: 60vh; overflow-y: auto; padding-left: 10px;">
-                <!-- התוכן יוזרק כאן על ידי ה-JS -->
             </div>
             <button onclick="closeAdvisor()" class="btn-primary" style="margin-top:20px; width:100%; background:#8e44ad;">הבנתי, סגור חלונית</button>
         </div>
