@@ -680,11 +680,34 @@ function runFairnessCheck() {
     const resultsUl = document.getElementById('fairness-results'); resultsUl.innerHTML = ''; let issuesFound = 0;
     let totalHoursArr = globalSoldiers.map(s => globalStats[s.name].totalMs / 3600000);
     let avgHours = totalHoursArr.reduce((a, b) => a + b, 0) / (totalHoursArr.length || 1);
+    let totalShiftsArr = globalSoldiers.map(s => globalStats[s.name].shiftsCount);
+    let avgShifts = totalShiftsArr.reduce((a, b) => a + b, 0) / (totalSoldiers.length || 1);
 
     globalSoldiers.forEach(s => {
         let stats = globalStats[s.name]; let hours = stats.totalMs / 3600000;
-        if (Math.abs(hours - avgHours) >= 1.5) { resultsUl.innerHTML += `<li>⚠️ פער שעות: ${s.name} סוגר ${hours} שעות, בעוד הממוצע הוא ${avgHours.toFixed(1)}.</li>`; issuesFound++; }
+       if (Math.abs(hours - avgHours) >= 1.5) {
+            // חישוב ההפרשים מהממוצע
+            let shiftsDiff = stats.shiftsCount - avgShifts;
+            let hoursDiff = hours - avgHours;
 
+            // עיבוד פרמטר Y (כמות שמירות וכיוון)
+            let absShifts = Math.abs(shiftsDiff).toFixed(1);
+            if (absShifts.endsWith('.0')) absShifts = Math.floor(Math.abs(shiftsDiff)).toString();
+            let yWord = (absShifts === "1") ? "שמירה אחת" : `${absShifts} שמירות`;
+            let yDirection = shiftsDiff >= 0 ? "יותר" : "פחות";
+
+            // עיבוד פרמטר Z (כמות שעות וכיוון)
+            let zText = Math.abs(hoursDiff).toFixed(1);
+            if (zText.endsWith('.0')) zText = Math.floor(Math.abs(hoursDiff)).toString();
+            let zDirection = hoursDiff >= 0 ? "יותר" : "פחות";
+
+            // עיבוד פרמטר R (האם נהג או חייל רגיל)
+            let rText = s.isDriver ? "נהג 🚗" : "חייל רגיל 👤";
+
+            // הזרקת הניסוח החדש המבוקש
+            resultsUl.innerHTML += `<li>⚠️ ${s.name} שומר ${yWord} ${yDirection}, וסה"כ ${zText} שעות ${zDirection} מהממוצע - ${rText}</li>`;
+            issuesFound++;
+        }
         let sortedAssignments = [...stats.assignments].sort((a,b) => a.start - b.start);
         for (let i = 0; i < sortedAssignments.length - 1; i++) {
             let gap = (sortedAssignments[i+1].start - sortedAssignments[i].end) / 3600000;
