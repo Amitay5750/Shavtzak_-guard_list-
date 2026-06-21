@@ -14,11 +14,13 @@
             </div>
             <ul>
                 <li id="nav-schedule" class="active" onclick="showSection('schedule')">לוח שמירות</li>
+                <li id="nav-report" onclick="showSection('report')">דו"ח חייל אישי</li>
                 <li id="nav-admin" onclick="showSection('admin')">ניהול והגדרות</li>
             </ul>
         </nav>
 
         <main class="content">
+            <!-- לוח שמירות -->
             <div id="schedule-section">
                 <header>
                     <h1>לוח שיבוץ משמרות</h1>
@@ -57,6 +59,68 @@
                 </div>
             </div>
 
+            <!-- דו"ח חייל (חדש!) -->
+            <div id="report-section" style="display:none;">
+                <header>
+                    <h1>דו"ח חייל אישי</h1>
+                </header>
+                
+                <div class="card">
+                    <h3>בחירת חייל לתחקור</h3>
+                    <div class="input-group" style="max-width: 400px;">
+                        <select id="report-soldier-select" style="padding: 12px; border: 1px solid #ddd; border-radius: 6px; flex:1;">
+                            <option value="">בחר חייל...</option>
+                        </select>
+                        <button onclick="generateSoldierReport()" class="btn-primary">הפק דו"ח</button>
+                    </div>
+                </div>
+
+                <div id="report-results" style="display:none;">
+                    <div class="stats">
+                        <div class="card stat-card" style="border-right: 4px solid #3498db;">
+                            <h3>סך הכל משמרות</h3>
+                            <p id="report-total-shifts">0</p>
+                        </div>
+                        <div class="card stat-card" style="border-right: 4px solid #e67e22;">
+                            <h3>סה"כ שעות שמירה</h3>
+                            <p id="report-total-hours">0</p>
+                        </div>
+                    </div>
+
+                    <div class="admin-grid">
+                        <div class="card table-container">
+                            <h3>פירוט שמירות (בלוח הנוכחי)</h3>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>עמדה</th>
+                                        <th>זמן</th>
+                                        <th>משך</th>
+                                        <th>מנוחה עד לפעם הבאה</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="report-shifts-tbody"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="card table-container">
+                            <h3>חריגים מדווחים (תורנויות / בית)</h3>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>סוג</th>
+                                        <th>התחלה</th>
+                                        <th>סיום</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="report-exc-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- דף ניהול והגדרות -->
             <div id="admin-section" style="display:none;">
                 <header>
                     <h1>ניהול כוח אדם ועמדות</h1>
