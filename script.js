@@ -67,8 +67,11 @@ function updateUI() {
         if (globalSoldiers.length === 0) {
             sList.innerHTML = '<li style="color: #95a5a6; font-style: italic;">אין חיילים במערכת</li>';
         } else {
-            // הוספת כפתור מחיקה לחייל
-            sList.innerHTML = globalSoldiers.map(s => `<li>• ${s.name} <button onclick="deleteSoldier(${s.id})" style="background:none; color:red; border:none; padding:0 10px; font-size:0.9em; cursor:pointer;">(הסר)</button></li>`).join('');
+            // רשימה ממוספרת בצורה מסודרת
+            sList.innerHTML = globalSoldiers.map((s, index) => 
+                `<li><span style="display:inline-block; width:20px; font-weight:bold;">${index + 1}.</span> ${s.name} <button onclick="deleteSoldier(${s.id})" style="background:none; color:red; border:none; padding:0 10px; font-size:0.9em; cursor:pointer; margin-right:auto;">(הסר)</button></li>`
+            ).join('');
+            
             globalSoldiers.forEach(s => {
                 excSoldierSelect.innerHTML += `<option value="${s.name}">${s.name}</option>`;
             });
@@ -80,19 +83,20 @@ function updateUI() {
         if (globalPositions.length === 0) {
             pList.innerHTML = '<li style="color: #95a5a6; font-style: italic;">אין עמדות במערכת</li>';
         } else {
-            // הוספת כפתור מחיקה לעמדה
-            pList.innerHTML = globalPositions.map(p => `<li>• ${p.name} <span style="color:#7f8c8d; font-size:0.9em;">(${p.duration} שעות | ${p.reqSoldiers} חיילים)</span> <button onclick="deletePosition(${p.id})" style="background:none; color:red; border:none; padding:0 10px; font-size:0.9em; cursor:pointer;">(הסר)</button></li>`).join('');
+            pList.innerHTML = globalPositions.map((p, index) => 
+                `<li><span style="display:inline-block; width:20px; font-weight:bold;">${index + 1}.</span> ${p.name} <span style="color:#7f8c8d; font-size:0.9em; margin-right:5px;">(${p.duration} שעות | ${p.reqSoldiers} חיילים)</span> <button onclick="deletePosition(${p.id})" style="background:none; color:red; border:none; padding:0 10px; font-size:0.9em; cursor:pointer; margin-right:auto;">(הסר)</button></li>`
+            ).join('');
         }
     }
 
     const eList = document.getElementById('admin-exceptions-list');
     if (eList) {
         if (globalExceptions.length === 0) eList.innerHTML = '<li style="color: #95a5a6; font-style: italic;">אין חריגים במערכת</li>';
-        else eList.innerHTML = globalExceptions.map(e => {
+        else eList.innerHTML = globalExceptions.map((e, index) => {
             let startD = new Date(e.startMs);
             let endD = new Date(e.endMs);
             let tStr = `${startD.getDate()}/${startD.getMonth()+1} ${startD.getHours().toString().padStart(2,'0')}:${startD.getMinutes().toString().padStart(2,'0')} - ${endD.getHours().toString().padStart(2,'0')}:${endD.getMinutes().toString().padStart(2,'0')}`;
-            return `<li>• <strong>${e.soldierName}</strong>: ${e.type} <span style="color:#7f8c8d; font-size:0.9em; margin-right:10px;" dir="ltr">${tStr}</span> <button onclick="deleteException(${e.id})" style="background:none; color:red; border:none; padding:0 10px; font-size:0.9em; cursor:pointer;">(הסר)</button></li>`;
+            return `<li><span style="display:inline-block; width:20px; font-weight:bold;">${index + 1}.</span> <strong>${e.soldierName}</strong>: ${e.type} <span style="color:#7f8c8d; font-size:0.9em; margin-right:10px;" dir="ltr">${tStr}</span> <button onclick="deleteException(${e.id})" style="background:none; color:red; border:none; padding:0 10px; font-size:0.9em; cursor:pointer; margin-right:auto;">(הסר)</button></li>`;
         }).join('');
     }
 
@@ -117,14 +121,11 @@ function addSoldier() {
     input.focus();
 }
 
-// פונקציית מחיקת חייל חדשה
 function deleteSoldier(id) {
     const soldierToDelete = globalSoldiers.find(s => s.id === id);
     if (soldierToDelete) {
-        // מוחק גם את כל החריגים הקשורים לחייל הזה כדי למנוע שגיאות
         globalExceptions = globalExceptions.filter(e => e.soldierName !== soldierToDelete.name);
     }
-    
     globalSoldiers = globalSoldiers.filter(s => s.id !== id);
     saveDataToStorage();
     isScheduleGenerated = false;
@@ -153,7 +154,6 @@ function addPosition() {
     nameInput.focus();
 }
 
-// פונקציית מחיקת עמדה חדשה
 function deletePosition(id) {
     globalPositions = globalPositions.filter(p => p.id !== id);
     saveDataToStorage();
@@ -296,7 +296,7 @@ function renderTable() {
         soldierLastPosition[s.name] = null;
     });
     
-    let currentSoldierIndex = 0;
+    let lastAssignedIndex = -1; // משתנה גלובלי לכלל השיבוץ למניעת לופים
 
     allShifts.forEach(shift => {
         let assignedList = []; 
@@ -307,12 +307,10 @@ function renderTable() {
                 let goodCandidate = null;       
                 let emergencyCandidate = null;  
                 
-                let checkedCount = 0;
-                
-                while (checkedCount < globalSoldiers.length) {
-                    let candidate = globalSoldiers[currentSoldierIndex % globalSoldiers.length].name;
-                    currentSoldierIndex++;
-                    checkedCount++;
+                // סורקים תמיד על פני כל כמות החיילים הקיימת במערכת
+                for (let i = 1; i <= globalSoldiers.length; i++) {
+                    let checkIdx = (lastAssignedIndex + i) % globalSoldiers.length;
+                    let candidate = globalSoldiers[checkIdx].name;
 
                     if (assignedList.includes(candidate)) continue;
 
@@ -347,24 +345,27 @@ function renderTable() {
                     if (!overlaps) {
                         if (hasSufficientRest) {
                             if (soldierLastPosition[candidate] !== shift.posId) {
-                                bestCandidate = candidate;
-                                break; 
+                                bestCandidate = { name: candidate, idx: checkIdx };
+                                break; // מושלם! מצאנו, אין צורך להמשיך לסרוק.
                             } else if (!goodCandidate) {
-                                goodCandidate = candidate; 
+                                goodCandidate = { name: candidate, idx: checkIdx }; 
                             }
                         } else if (!emergencyCandidate) {
-                            emergencyCandidate = candidate; 
+                            emergencyCandidate = { name: candidate, idx: checkIdx }; 
                         }
                     }
                 }
                 
-                let chosen = bestCandidate || goodCandidate || emergencyCandidate || "חסר כוח אדם!"; 
+                let chosenObj = bestCandidate || goodCandidate || emergencyCandidate; 
+                let chosenName = "חסר כוח אדם!";
                 
-                if (chosen !== "חסר כוח אדם!") {
-                     soldierAssignments[chosen].push({start: shift.startMs, end: shift.endMs});
-                     soldierLastPosition[chosen] = shift.posId;
+                if (chosenObj) {
+                     chosenName = chosenObj.name;
+                     lastAssignedIndex = chosenObj.idx; // המפתח האמיתי! מעדכן את המונה רק כשיש שיבוץ אמת
+                     soldierAssignments[chosenName].push({start: shift.startMs, end: shift.endMs});
+                     soldierLastPosition[chosenName] = shift.posId;
                 }
-                assignedList.push(chosen);
+                assignedList.push(chosenName);
             }
         } else {
              for (let slot = 0; slot < shift.reqSoldiers; slot++) {
