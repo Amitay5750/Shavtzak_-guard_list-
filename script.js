@@ -545,7 +545,7 @@ function generateSoldierReport() {
     excTbody.innerHTML = '';
 
     if (exc.length === 0) {
-         excTbody.innerHTML = '<tr><td colspan="3" style="color:#7f8c8d; padding:20px;">אין (חייל זמין לחלוטין למצבה)</td></tr>';
+         excTbody.innerHTML = '<tr><td colspan="3" style="color:#7f8c8d; padding:20px;">אין (חייל זמין לחלוטין)</td></tr>';
     } else {
         exc.forEach(e => {
             let sDate = new Date(e.startMs);
