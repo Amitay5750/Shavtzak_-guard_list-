@@ -2,9 +2,13 @@ let isScheduleGenerated = false;
 let globalSoldiers = [];
 let globalPositions = [];
 let globalExceptions = []; 
-let globalSoldierShifts = {}; // זיכרון חדש עבור הדו"ח האישי
+
+// מנוע השיבוץ הראשי החדש! המערכת שומרת את הלוח כאובייקט
+let globalSchedule = []; 
+let globalStats = {}; 
 
 const MIN_REST_MS = 2 * 60 * 60 * 1000; 
+const DRIVER_SLEEP_MS = 6 * 60 * 60 * 1000; // 6 שעות חסימה לנהג
 
 window.onload = () => {
     const now = new Date();
@@ -22,9 +26,6 @@ window.onload = () => {
     if(excEndInput) excEndInput.value = new Date(start.getTime() + 6 * 60 * 60 * 1000).toISOString().slice(0, 16); 
     
     document.getElementById('soldier-name')?.addEventListener('keypress', e => { if (e.key === 'Enter') addSoldier(); });
-    document.getElementById('position-name')?.addEventListener('keypress', e => { if (e.key === 'Enter') addPosition(); });
-    document.getElementById('position-duration')?.addEventListener('keypress', e => { if (e.key === 'Enter') addPosition(); });
-    document.getElementById('position-req-soldiers')?.addEventListener('keypress', e => { if (e.key === 'Enter') addPosition(); });
     
     loadDataFromStorage();
 };
@@ -33,20 +34,32 @@ function showSection(id) {
     document.getElementById('schedule-section').style.display = id === 'schedule' ? 'block' : 'none';
     document.getElementById('admin-section').style.display = id === 'admin' ? 'block' : 'none';
     document.getElementById('report-section').style.display = id === 'report' ? 'block' : 'none';
+    document.getElementById('control-section').style.display = id === 'control' ? 'block' : 'none';
     
     document.getElementById('nav-schedule').classList.toggle('active', id === 'schedule');
     document.getElementById('nav-admin').classList.toggle('active', id === 'admin');
     document.getElementById('nav-report').classList.toggle('active', id === 'report');
+    document.getElementById('nav-control').classList.toggle('active', id === 'control');
+
+    if (id === 'control' && isScheduleGenerated) {
+        populateControlTab();
+    }
 }
 
 function loadDataFromStorage() {
     const savedSoldiers = localStorage.getItem('soldiersData');
     const savedPositions = localStorage.getItem('positionsData');
     const savedExceptions = localStorage.getItem('exceptionsData');
+    const savedSchedule = localStorage.getItem('scheduleData');
 
     if (savedSoldiers) globalSoldiers = JSON.parse(savedSoldiers);
     if (savedPositions) globalPositions = JSON.parse(savedPositions);
     if (savedExceptions) globalExceptions = JSON.parse(savedExceptions);
+    if (savedSchedule) {
+        globalSchedule = JSON.parse(savedSchedule);
+        isScheduleGenerated = true;
+        recalculateStats();
+    }
 
     updateUI();
 }
@@ -55,6 +68,11 @@ function saveDataToStorage() {
     localStorage.setItem('soldiersData', JSON.stringify(globalSoldiers));
     localStorage.setItem('positionsData', JSON.stringify(globalPositions));
     localStorage.setItem('exceptionsData', JSON.stringify(globalExceptions));
+    if (isScheduleGenerated) {
+        localStorage.setItem('scheduleData', JSON.stringify(globalSchedule));
+    } else {
+        localStorage.removeItem('scheduleData');
+    }
 }
 
 function updateUI() {
@@ -65,7 +83,7 @@ function updateUI() {
 
     const sList = document.getElementById('admin-soldiers-list');
     const excSoldierSelect = document.getElementById('exception-soldier');
-    const repSoldierSelect = document.getElementById('report-soldier-select'); // תפריט הדו"ח
+    const repSoldierSelect = document.getElementById('report-soldier-select'); 
     
     if (sList && excSoldierSelect && repSoldierSelect) {
         excSoldierSelect.innerHTML = '<option value="">בחר חייל...</option>';
@@ -74,7 +92,10 @@ function updateUI() {
         if (globalSoldiers.length === 0) {
             sList.innerHTML = '<li style="color: #95a5a6; font-style: italic;">אין חיילים במערכת</li>';
         } else {
-            sList.innerHTML = globalSoldiers.map((s, idx) => `<li><span style="display:inline-block; width:20px; font-weight:bold;">${idx + 1}.</span> ${s.name} <button onclick="deleteSoldier(${s.id})" style="background:none; color:red; border:none; padding:0 10px; font-size:0.9em; cursor:pointer; margin-right:auto;">(הסר)</button></li>`).join('');
+            sList.innerHTML = globalSoldiers.map((s, idx) => {
+                let driverTag = s.isDriver ? ' <span style="color:#2980b9; font-size:0.85em; font-weight:bold;">[נהג]</span>' : '';
+                return `<li><span style="display:inline-block; width:20px; font-weight:bold;">${idx + 1}.</span> ${s.name} ${driverTag} <button onclick="deleteSoldier(${s.id})" style="background:none; color:red; border:none; padding:0 10px; font-size:0.9em; cursor:pointer; margin-right:auto;">(הסר)</button></li>`;
+            }).join('');
             globalSoldiers.forEach(s => {
                 excSoldierSelect.innerHTML += `<option value="${s.name}">${s.name}</option>`;
                 repSoldierSelect.innerHTML += `<option value="${s.name}">${s.name}</option>`;
@@ -86,7 +107,10 @@ function updateUI() {
     if (pList) {
         if (globalPositions.length === 0) pList.innerHTML = '<li style="color: #95a5a6; font-style: italic;">אין עמדות במערכת</li>';
         else {
-            pList.innerHTML = globalPositions.map((p, idx) => `<li><span style="display:inline-block; width:20px; font-weight:bold;">${idx + 1}.</span> ${p.name} <span style="color:#7f8c8d; font-size:0.9em; margin-right:5px;">(${p.duration} שעות | ${p.reqSoldiers} חיילים)</span> <button onclick="deletePosition(${p.id})" style="background:none; color:red; border:none; padding:0 10px; font-size:0.9em; cursor:pointer; margin-right:auto;">(הסר)</button></li>`).join('');
+            pList.innerHTML = globalPositions.map((p, idx) => {
+                let driverTag = p.reqDriver ? ' <span style="color:#2980b9; font-size:0.85em; font-weight:bold;">[דורש נהג]</span>' : '';
+                return `<li><span style="display:inline-block; width:20px; font-weight:bold;">${idx + 1}.</span> ${p.name} ${driverTag} <span style="color:#7f8c8d; font-size:0.9em; margin-right:5px;">(${p.duration} שעות | ${p.reqSoldiers} חיילים)</span> <button onclick="deletePosition(${p.id})" style="background:none; color:red; border:none; padding:0 10px; font-size:0.9em; cursor:pointer; margin-right:auto;">(הסר)</button></li>`;
+            }).join('');
         }
     }
 
@@ -101,11 +125,15 @@ function updateUI() {
         }).join('');
     }
 
-    renderTable();
+    if (isScheduleGenerated) {
+        renderTable();
+        populateControlTab();
+    }
 }
 
 function addSoldier() {
     const input = document.getElementById('soldier-name');
+    const isDriverInput = document.getElementById('soldier-is-driver');
     const val = input.value.trim();
     if (!val) return;
     
@@ -114,9 +142,10 @@ function addSoldier() {
         return;
     }
     
-    globalSoldiers.push({ id: Date.now(), name: val });
+    globalSoldiers.push({ id: Date.now(), name: val, isDriver: isDriverInput.checked });
     saveDataToStorage();
     input.value = '';
+    isDriverInput.checked = false;
     isScheduleGenerated = false;
     updateUI();
     input.focus();
@@ -137,6 +166,7 @@ function addPosition() {
     const nameInput = document.getElementById('position-name');
     const durInput = document.getElementById('position-duration');
     const reqInput = document.getElementById('position-req-soldiers');
+    const reqDriverInput = document.getElementById('position-req-driver');
     
     const name = nameInput.value.trim();
     const dur = parseInt(durInput.value.trim() || "4"); 
@@ -144,12 +174,13 @@ function addPosition() {
     
     if (!name) return;
     
-    globalPositions.push({ id: Date.now(), name: name, duration: dur, reqSoldiers: req });
+    globalPositions.push({ id: Date.now(), name: name, duration: dur, reqSoldiers: req, reqDriver: reqDriverInput.checked });
     saveDataToStorage();
 
     nameInput.value = '';
     durInput.value = '';
     reqInput.value = '';
+    reqDriverInput.checked = false;
     isScheduleGenerated = false;
     updateUI();
     nameInput.focus();
@@ -168,18 +199,12 @@ function addException() {
     const startStr = document.getElementById('exception-start').value;
     const endStr = document.getElementById('exception-end').value;
 
-    if (!soldier || !startStr || !endStr) {
-        alert("נא למלא את כל השדות להוספת חריגה.");
-        return;
-    }
+    if (!soldier || !startStr || !endStr) return alert("נא למלא את כל השדות להוספת חריגה.");
 
     const startMs = new Date(startStr).getTime();
     const endMs = new Date(endStr).getTime();
 
-    if (startMs >= endMs) {
-        alert("זמן סיום חייב להיות אחרי זמן התחלה.");
-        return;
-    }
+    if (startMs >= endMs) return alert("זמן סיום חייב להיות אחרי זמן התחלה.");
 
     globalExceptions.push({ id: Date.now(), soldierName: soldier, type: type, startMs: startMs, endMs: endMs });
     saveDataToStorage();
@@ -195,35 +220,185 @@ function deleteException(id) {
 }
 
 function resetSystem() {
-    if (confirm("פעולה זו תמחק לחלוטין את כל הנתונים כולל חריגים. האם להמשיך?")) {
+    if (confirm("פעולה זו תמחק לחלוטין את כל הנתונים. האם להמשיך?")) {
         globalSoldiers = [];
         globalPositions = [];
         globalExceptions = [];
+        globalSchedule = [];
         localStorage.clear();
         isScheduleGenerated = false;
         updateUI();
     }
 }
 
+// ---------------- מנוע בניית הלוח ----------------
 function generateSchedule() {
     if (globalSoldiers.length === 0 || globalPositions.length === 0) {
-        alert("יש להזין לפחות חייל אחד ועמדה אחת כדי לבצע שיבוץ.");
-        return;
+        return alert("יש להזין לפחות חייל אחד ועמדה אחת כדי לבצע שיבוץ.");
     }
 
-    let totalConcurrentSoldiersNeeded = 0;
-    globalPositions.forEach(pos => totalConcurrentSoldiersNeeded += pos.reqSoldiers);
+    const startInput = document.getElementById('start-time');
+    const endInput = document.getElementById('end-time');
+    const start = new Date(startInput ? startInput.value : new Date());
+    const end = new Date(endInput ? endInput.value : new Date().getTime() + 86400000);
 
-    if (globalSoldiers.length < totalConcurrentSoldiersNeeded) {
-        alert(`שגיאה קריטית: חסר כוח אדם!\nסך העמדות דורשות ${totalConcurrentSoldiersNeeded} חיילים במקביל, אך רשומים רק ${globalSoldiers.length} חיילים.`);
-        return;
-    }
+    globalSchedule = []; // איפוס הלוח הקודם
+    
+    // יצירת מבנה הבלוקים של השמירות
+    globalPositions.forEach(pos => {
+        let cur = new Date(start);
+        while (cur < end) {
+            let next = new Date(cur.getTime() + pos.duration * 60 * 60 * 1000);
+            if (next > end) next = end;
+            
+            globalSchedule.push({
+                id: pos.id + '_' + cur.getTime(), // ID ייחודי למשמרת בלוח
+                posId: pos.id,
+                posName: pos.name,
+                startMs: cur.getTime(),
+                endMs: next.getTime(),
+                durationHours: Math.round((next - cur) / 3600000),
+                reqSoldiers: pos.reqSoldiers,
+                reqDriver: pos.reqDriver,
+                soldiers: [] // יתמלא באלגוריתם
+            });
+            cur = next;
+        }
+    });
+
+    globalSchedule.sort((a, b) => a.startMs - b.startMs);
+
+    let tempAssignments = {};
+    globalSoldiers.forEach(s => { tempAssignments[s.name] = []; });
+    let tempStats = {};
+    globalSoldiers.forEach(s => { tempStats[s.name] = { totalMs: 0, nightMs: 0, lastEnd: 0 }; });
+
+    globalSchedule.forEach(shift => {
+        let shiftHour = new Date(shift.startMs).getHours();
+        let isNightShift = (shiftHour >= 0 && shiftHour < 6); // עודכן ל-00:00 עד 06:00
+        
+        for (let slot = 0; slot < shift.reqSoldiers; slot++) {
+            let isDriverRequiredForThisSlot = (shift.reqDriver && slot === 0); 
+            let validCandidates = [];
+            
+            globalSoldiers.forEach(soldier => {
+                let candidate = soldier.name;
+                
+                if (isDriverRequiredForThisSlot && !soldier.isDriver) return;
+                if (shift.soldiers.includes(candidate)) return;
+
+                let isExcluded = false;
+                for (let exc of globalExceptions) {
+                    if (exc.soldierName === candidate && Math.max(shift.startMs, exc.startMs) < Math.min(shift.endMs, exc.endMs)) {
+                        isExcluded = true; break;
+                    }
+                }
+                if (isExcluded) return; 
+
+                // בדיקת מנוחה בסיסית (שעתיים)
+                let hasSufficientRest = true;
+                for (let existingShift of tempAssignments[candidate]) {
+                    if (Math.max(shift.startMs, existingShift.start - MIN_REST_MS) < Math.min(shift.endMs, existingShift.end + MIN_REST_MS)) {
+                        hasSufficientRest = false; break;
+                    }
+                }
+                if (hasSufficientRest) {
+                    for (let exc of globalExceptions) {
+                        if (exc.soldierName === candidate && Math.max(shift.startMs, exc.startMs - MIN_REST_MS) < Math.min(shift.endMs, exc.endMs + MIN_REST_MS)) {
+                            hasSufficientRest = false; break;
+                        }
+                    }
+                }
+                
+                // בדיקת מנוחת נהג אגרסיבית (6 שעות לפני המשמרת!)
+                if (hasSufficientRest && isDriverRequiredForThisSlot) {
+                    for (let existingShift of tempAssignments[candidate]) {
+                        if (Math.max(shift.startMs - DRIVER_SLEEP_MS, existingShift.start) < Math.min(shift.startMs, existingShift.end)) {
+                            hasSufficientRest = false; break;
+                        }
+                    }
+                    if (hasSufficientRest) {
+                        for (let exc of globalExceptions) {
+                            if (exc.soldierName === candidate && Math.max(shift.startMs - DRIVER_SLEEP_MS, exc.startMs) < Math.min(shift.startMs, exc.endMs)) {
+                                hasSufficientRest = false; break;
+                            }
+                        }
+                    }
+                }
+
+                if (!hasSufficientRest) return;
+                
+                let stats = tempStats[candidate];
+                let effectiveLastEnd = stats.lastEnd;
+                for (let exc of globalExceptions) {
+                    if (exc.soldierName === candidate && exc.endMs <= shift.startMs && exc.endMs > effectiveLastEnd) {
+                        effectiveLastEnd = exc.endMs;
+                    }
+                }
+
+                validCandidates.push({
+                    name: candidate,
+                    totalMs: stats.totalMs,
+                    nightMs: stats.nightMs,
+                    lastEnd: effectiveLastEnd
+                });
+            });
+            
+            validCandidates.sort((a, b) => {
+                if (isNightShift && (a.nightMs - b.nightMs !== 0)) return a.nightMs - b.nightMs;
+                if (a.totalMs - b.totalMs !== 0) return a.totalMs - b.totalMs;
+                return a.lastEnd - b.lastEnd;
+            });
+            
+            let chosen = "חסר כוח אדם!";
+            if (validCandidates.length > 0) {
+                 let winner = validCandidates[0];
+                 chosen = winner.name;
+                 
+                 tempAssignments[chosen].push({start: shift.startMs, end: shift.endMs});
+                 let shiftDurationMs = shift.endMs - shift.startMs;
+                 tempStats[chosen].totalMs += shiftDurationMs;
+                 if (isNightShift) tempStats[chosen].nightMs += shiftDurationMs;
+                 tempStats[chosen].lastEnd = Math.max(tempStats[chosen].lastEnd, shift.endMs);
+            }
+            shift.soldiers.push(chosen);
+        }
+    });
 
     isScheduleGenerated = true;
+    saveDataToStorage();
+    recalculateStats();
     renderTable(); 
+    populateControlTab();
 }
 
+// ---------------- בניית הסטטיסטיקות לאחר שהלוח קיים ----------------
+function recalculateStats() {
+    globalStats = {};
+    globalSoldiers.forEach(s => {
+        globalStats[s.name] = { totalMs: 0, nightMs: 0, shiftsCount: 0, assignments: [] };
+    });
+
+    globalSchedule.forEach(shift => {
+        let shiftHour = new Date(shift.startMs).getHours();
+        let isNightShift = (shiftHour >= 0 && shiftHour < 6);
+        let shiftDurationMs = shift.endMs - shift.startMs;
+
+        shift.soldiers.forEach(soldierName => {
+            if (globalStats[soldierName]) {
+                globalStats[soldierName].shiftsCount++;
+                globalStats[soldierName].totalMs += shiftDurationMs;
+                if (isNightShift) globalStats[soldierName].nightMs += shiftDurationMs;
+                globalStats[soldierName].assignments.push({ start: shift.startMs, end: shift.endMs, posName: shift.posName, shiftId: shift.id });
+            }
+        });
+    });
+}
+
+// ---------------- ציור הלוח (מתוך הזיכרון בלבד!) ----------------
 function renderTable() {
+    if (!isScheduleGenerated) return;
+
     const thead = document.getElementById('guard-table-head');
     const tbody = document.getElementById('guard-table-body');
     if(!thead || !tbody) return;
@@ -235,172 +410,20 @@ function renderTable() {
 
     thead.innerHTML = '';
     tbody.innerHTML = '';
-    
-    // אתחול זיכרון הדו"ח
-    globalSoldierShifts = {};
-    globalSoldiers.forEach(s => globalSoldierShifts[s.name] = []);
-
-    if (globalPositions.length === 0) {
-        thead.innerHTML = '<tr><th>סטטוס</th></tr>';
-        tbody.innerHTML = '<tr><td style="padding:30px; color:#7f8c8d;">נא להוסיף עמדות כדי להתחיל</td></tr>';
-        return;
-    }
 
     let headerTr = document.createElement('tr');
-    let thDay = document.createElement('th');
-    thDay.innerText = 'יום';
-    thDay.style.width = '80px';
-    headerTr.appendChild(thDay);
-
-    let thExc = document.createElement('th');
-    thExc.innerText = 'מחוץ לשבצק';
-    thExc.style.width = '140px';
-    headerTr.appendChild(thExc);
-
-    let thTime = document.createElement('th');
-    thTime.innerText = 'שעה';
-    thTime.style.width = '120px';
-    headerTr.appendChild(thTime);
+    let thDay = document.createElement('th'); thDay.innerText = 'יום'; thDay.style.width = '80px'; headerTr.appendChild(thDay);
+    let thExc = document.createElement('th'); thExc.innerText = 'מחוץ לשבצק'; thExc.style.width = '140px'; headerTr.appendChild(thExc);
+    let thTime = document.createElement('th'); thTime.innerText = 'שעה'; thTime.style.width = '120px'; headerTr.appendChild(thTime);
 
     globalPositions.forEach(pos => {
         let th = document.createElement('th');
         let reqStr = pos.reqSoldiers > 1 ? ` - זוגי` : ``;
-        th.innerText = `${pos.name} (${pos.duration} ש'${reqStr})`;
+        let driverTag = pos.reqDriver ? ` (🚗)` : ``;
+        th.innerText = `${pos.name} (${pos.duration} ש'${reqStr})${driverTag}`;
         headerTr.appendChild(th);
     });
     thead.appendChild(headerTr);
-
-    let allShifts = [];
-    globalPositions.forEach(pos => {
-        let cur = new Date(start);
-        while (cur < end) {
-            let next = new Date(cur.getTime() + pos.duration * 60 * 60 * 1000);
-            if (next > end) next = end;
-            allShifts.push({
-                posId: pos.id,
-                reqSoldiers: pos.reqSoldiers,
-                startMs: cur.getTime(),
-                endMs: next.getTime(),
-                durationHours: Math.round((next - cur) / 3600000)
-            });
-            cur = next;
-        }
-    });
-
-    allShifts.sort((a, b) => a.startMs - b.startMs);
-
-    let assignments = {};
-    globalPositions.forEach(pos => { assignments[pos.id] = []; });
-    
-    let soldierAssignments = {};
-    let soldierStats = {}; 
-    
-    globalSoldiers.forEach(s => { 
-        soldierAssignments[s.name] = []; 
-        soldierStats[s.name] = { totalMs: 0, nightMs: 0, lastEnd: 0 };
-    });
-    
-    allShifts.forEach(shift => {
-        let assignedList = []; 
-        let shiftHour = new Date(shift.startMs).getHours();
-        let isNightShift = (shiftHour >= 22 || shiftHour < 6);
-        let currentPosName = globalPositions.find(p => p.id === shift.posId)?.name || "משמרת";
-        
-        if (isScheduleGenerated && globalSoldiers.length > 0) {
-            for (let slot = 0; slot < shift.reqSoldiers; slot++) {
-                let validCandidates = [];
-                
-                globalSoldiers.forEach(soldier => {
-                    let candidate = soldier.name;
-                    if (assignedList.includes(candidate)) return;
-
-                    let isExcluded = false;
-                    for (let exc of globalExceptions) {
-                        if (exc.soldierName === candidate) {
-                            if (Math.max(shift.startMs, exc.startMs) < Math.min(shift.endMs, exc.endMs)) {
-                                isExcluded = true;
-                                break;
-                            }
-                        }
-                    }
-                    if (isExcluded) return; 
-
-                    let hasSufficientRest = true;
-                    for (let existingShift of soldierAssignments[candidate]) {
-                        if (Math.max(shift.startMs, existingShift.start - MIN_REST_MS) < Math.min(shift.endMs, existingShift.end + MIN_REST_MS)) {
-                            hasSufficientRest = false;
-                            break;
-                        }
-                    }
-                    
-                    if (hasSufficientRest) {
-                        for (let exc of globalExceptions) {
-                            if (exc.soldierName === candidate) {
-                                if (Math.max(shift.startMs, exc.startMs - MIN_REST_MS) < Math.min(shift.endMs, exc.endMs + MIN_REST_MS)) {
-                                    hasSufficientRest = false;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    
-                    if (!hasSufficientRest) return;
-                    
-                    let stats = soldierStats[candidate];
-                    let effectiveLastEnd = stats.lastEnd;
-                    
-                    for (let exc of globalExceptions) {
-                        if (exc.soldierName === candidate && exc.endMs <= shift.startMs && exc.endMs > effectiveLastEnd) {
-                            effectiveLastEnd = exc.endMs;
-                        }
-                    }
-
-                    validCandidates.push({
-                        name: candidate,
-                        totalMs: stats.totalMs,
-                        nightMs: stats.nightMs,
-                        lastEnd: effectiveLastEnd
-                    });
-                });
-                
-                validCandidates.sort((a, b) => {
-                    if (isNightShift) {
-                        let nightDiff = a.nightMs - b.nightMs;
-                        if (nightDiff !== 0) return nightDiff; 
-                    }
-                    let totalDiff = a.totalMs - b.totalMs;
-                    if (totalDiff !== 0) return totalDiff;
-                    return a.lastEnd - b.lastEnd;
-                });
-                
-                let chosen = "חסר כוח אדם!";
-                if (validCandidates.length > 0) {
-                     let winner = validCandidates[0];
-                     chosen = winner.name;
-                     
-                     soldierAssignments[chosen].push({start: shift.startMs, end: shift.endMs});
-                     let shiftDurationMs = shift.endMs - shift.startMs;
-                     soldierStats[chosen].totalMs += shiftDurationMs;
-                     if (isNightShift) soldierStats[chosen].nightMs += shiftDurationMs;
-                     soldierStats[chosen].lastEnd = Math.max(soldierStats[chosen].lastEnd, shift.endMs);
-                     
-                     // שמירת הנתון לטובת דו"ח החייל מבוקש
-                     globalSoldierShifts[chosen].push({ posName: currentPosName, start: shift.startMs, end: shift.endMs });
-                }
-                assignedList.push(chosen);
-            }
-        } else {
-             for (let slot = 0; slot < shift.reqSoldiers; slot++) {
-                 assignedList.push("ממתין לשיבוץ");
-             }
-        }
-
-        assignments[shift.posId].push({
-            startMs: shift.startMs,
-            durationHours: shift.durationHours,
-            soldiers: assignedList
-        });
-    });
 
     const daysHe = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
     let curTime = new Date(start);
@@ -438,8 +461,7 @@ function renderTable() {
                 tdExc.innerHTML = '<span style="color:#bdc3c7;">אין</span>';
             } else {
                 tdExc.innerHTML = dailyExceptions.map(e => {
-                    let s = new Date(e.startMs);
-                    let en = new Date(e.endMs);
+                    let s = new Date(e.startMs); let en = new Date(e.endMs);
                     let timeStr = `${s.getHours().toString().padStart(2,'0')}:${s.getMinutes().toString().padStart(2,'0')} - ${en.getHours().toString().padStart(2,'0')}:${en.getMinutes().toString().padStart(2,'0')}`;
                     let color = e.type === 'מטבח' ? '#d35400' : '#8e44ad';
                     return `<strong style="color:#2c3e50">${e.soldierName}</strong><br><span style="color:${color}; font-weight:bold;">${e.type}</span><br><span dir="ltr" style="color:#7f8c8d; font-size:0.85em;">${timeStr}</span>`;
@@ -456,26 +478,22 @@ function renderTable() {
         tr.appendChild(tdTime);
 
         globalPositions.forEach(pos => {
-            let shiftStart = assignments[pos.id].find(s => s.startMs === curTime.getTime());
+            // חיפוש בלוח שנשמר
+            let shiftData = globalSchedule.find(s => s.posId === pos.id && s.startMs === curTime.getTime());
             
-            if (shiftStart) {
+            if (shiftData) {
                 let td = document.createElement('td');
-                td.rowSpan = shiftStart.durationHours;
+                td.rowSpan = shiftData.durationHours;
                 
-                td.innerHTML = shiftStart.soldiers.join('<hr style="margin:5px 0; border:0; border-top:1px dashed #ccc;">');
+                td.innerHTML = shiftData.soldiers.join('<hr style="margin:5px 0; border:0; border-top:1px dashed #ccc;">');
                 td.style.verticalAlign = 'middle';
                 
-                if (shiftStart.soldiers.includes("חסר כוח אדם!")) {
-                    td.style.fontWeight = 'bold';
-                    td.style.color = '#e74c3c';
-                    td.style.backgroundColor = '#fadbd8'; 
-                } else if (shiftStart.soldiers.includes("ממתין לשיבוץ")) {
-                    td.style.color = '#95a5a6';
-                    td.style.fontStyle = 'italic';
+                if (shiftData.soldiers.includes("חסר כוח אדם!")) {
+                    td.style.fontWeight = 'bold'; td.style.color = '#e74c3c'; td.style.backgroundColor = '#fadbd8'; 
+                } else if (shiftData.soldiers.includes("ממתין לשיבוץ")) {
+                    td.style.color = '#95a5a6'; td.style.fontStyle = 'italic';
                 } else {
-                    td.style.fontWeight = 'bold';
-                    td.style.color = '#27ae60';
-                    td.style.backgroundColor = '#eafaf1'; 
+                    td.style.fontWeight = 'bold'; td.style.color = '#27ae60'; td.style.backgroundColor = '#eafaf1'; 
                 }
                 tr.appendChild(td);
             }
@@ -486,43 +504,186 @@ function renderTable() {
     }
 }
 
-// פונקציה חדשה להפקת דו"ח חייל
-function generateSoldierReport() {
-    if (!isScheduleGenerated) {
-        alert("יש לשבץ חיילים (לייצר לוח) לפני הפקת דו\"ח.");
-        return;
+// ---------------- שאילתות, בקרה והחלפות ----------------
+
+function populateControlTab() {
+    // 1. ציור טבלת הסיכום הפלוגתית
+    const tbody = document.getElementById('control-summary-tbody');
+    tbody.innerHTML = '';
+    
+    globalSoldiers.forEach(s => {
+        let st = globalStats[s.name];
+        let tHours = st.totalMs / 3600000;
+        let nHours = st.nightMs / 3600000;
+        tbody.innerHTML += `<tr>
+            <td style="font-weight:bold;">${s.name} ${s.isDriver ? '🚗' : ''}</td>
+            <td>${st.shiftsCount}</td>
+            <td>${tHours} ש'</td>
+            <td>${nHours} ש'</td>
+        </tr>`;
+    });
+
+    // 2. אכלוס תפריט ההחלפות
+    const outSelect = document.getElementById('swap-soldier-out');
+    const inSelect = document.getElementById('swap-soldier-in');
+    
+    outSelect.innerHTML = '<option value="">1. מי החייל שיורד מהשמירה?</option>';
+    inSelect.innerHTML = '<option value="">3. מי החייל שיעלה במקומו?</option>';
+    
+    globalSoldiers.forEach(s => {
+        outSelect.innerHTML += `<option value="${s.name}">${s.name}</option>`;
+        inSelect.innerHTML += `<option value="${s.name}">${s.name}</option>`;
+    });
+}
+
+function populateSwapShifts() {
+    const soldierName = document.getElementById('swap-soldier-out').value;
+    const shiftSelect = document.getElementById('swap-shift-select');
+    shiftSelect.innerHTML = '<option value="">2. בחר איזו משמרת להעביר...</option>';
+    
+    if (!soldierName || !globalStats[soldierName]) return;
+
+    let sShifts = globalStats[soldierName].assignments;
+    sShifts.sort((a, b) => a.start - b.start);
+    
+    sShifts.forEach(s => {
+        let d = new Date(s.start);
+        let timeStr = `${d.getDate()}/${d.getMonth()+1} ${d.getHours().toString().padStart(2,'0')}:00`;
+        shiftSelect.innerHTML += `<option value="${s.shiftId}">${s.posName} | ${timeStr}</option>`;
+    });
+}
+
+function executeSwap() {
+    const soldierOut = document.getElementById('swap-soldier-out').value;
+    const shiftId = document.getElementById('swap-shift-select').value;
+    const soldierIn = document.getElementById('swap-soldier-in').value;
+
+    if (!soldierOut || !shiftId || !soldierIn) return alert("נא לבחור את כל השדות להחלפה.");
+    if (soldierOut === soldierIn) return alert("לא ניתן להחליף חייל עם עצמו.");
+
+    let targetShift = globalSchedule.find(s => s.id === shiftId);
+    if (!targetShift) return alert("משמרת לא נמצאה.");
+
+    // ואלידציות של חייל נכנס
+    if (targetShift.soldiers.includes(soldierIn)) return alert("החייל המחליף כבר משובץ במשמרת זו!");
+
+    let isTargetDriver = globalSoldiers.find(s => s.name === soldierIn)?.isDriver;
+    let isDriverSlot = (targetShift.reqDriver && targetShift.soldiers.indexOf(soldierOut) === 0);
+    if (isDriverSlot && !isTargetDriver) {
+        return alert("שגיאה קשיחה: עמדה זו דורשת נהג, והמחליף אינו מוסמך!");
     }
 
-    const soldierName = document.getElementById('report-soldier-select').value;
-    if (!soldierName) {
-        alert("נא לבחור חייל מהרשימה.");
-        return;
+    // בדיקת התנגשויות זמן
+    let inStats = globalStats[soldierIn];
+    for (let s of inStats.assignments) {
+        if (Math.max(targetShift.startMs, s.start) < Math.min(targetShift.endMs, s.end)) {
+            return alert(`שגיאה קשיחה: ל${soldierIn} כבר יש משמרת אחרת בחופפת לזמן הזה!`);
+        }
     }
+    for (let exc of globalExceptions) {
+        if (exc.soldierName === soldierIn && Math.max(targetShift.startMs, exc.startMs) < Math.min(targetShift.endMs, exc.endMs)) {
+            return alert(`שגיאה קשיחה: ${soldierIn} נמצא ב${exc.type} בזמן הזה!`);
+        }
+    }
+
+    // בדיקת אזהרת מנוחה רכה
+    let restViolation = false;
+    for (let s of inStats.assignments) {
+        if (Math.max(targetShift.startMs, s.start - MIN_REST_MS) < Math.min(targetShift.endMs, s.end + MIN_REST_MS)) restViolation = true;
+    }
+    for (let exc of globalExceptions) {
+        if (exc.soldierName === soldierIn && Math.max(targetShift.startMs, exc.startMs - MIN_REST_MS) < Math.min(targetShift.endMs, exc.endMs + MIN_REST_MS)) restViolation = true;
+    }
+
+    if (restViolation) {
+        if (!confirm(`אזהרת מערכת: ההחלפה תגרום ל-${soldierIn} לשמור עם פחות משעתיים מנוחה. האם לאשר בכל זאת?`)) return;
+    }
+
+    // ביצוע ההחלפה בפועל!
+    let indexToReplace = targetShift.soldiers.indexOf(soldierOut);
+    targetShift.soldiers[indexToReplace] = soldierIn;
+
+    saveDataToStorage();
+    recalculateStats();
+    renderTable();
+    populateControlTab();
+    populateSwapShifts(); // רענון הרשימה אחרי שמשמרת אחת עברה
+    alert("ההחלפה בוצעה בהצלחה!");
+}
+
+function runFairnessCheck() {
+    const resultsUl = document.getElementById('fairness-results');
+    resultsUl.innerHTML = '';
+    let issuesFound = 0;
+
+    let totalHoursArr = globalSoldiers.map(s => globalStats[s.name].totalMs / 3600000);
+    let avgHours = totalHoursArr.reduce((a, b) => a + b, 0) / (totalHoursArr.length || 1);
+
+    globalSoldiers.forEach(s => {
+        let stats = globalStats[s.name];
+        let hours = stats.totalMs / 3600000;
+        
+        // בדיקת חריגת שעות
+        if (Math.abs(hours - avgHours) > 3) {
+            resultsUl.innerHTML += `<li>⚠️ פער שעות: ${s.name} סוגר ${hours} שעות, בעוד הממוצע הוא ${avgHours.toFixed(1)}.</li>`;
+            issuesFound++;
+        }
+
+        // בדיקת רצפי שמירה (מנוחה)
+        let sortedAssignments = [...stats.assignments].sort((a,b) => a.start - b.start);
+        for (let i = 0; i < sortedAssignments.length - 1; i++) {
+            let gap = (sortedAssignments[i+1].start - sortedAssignments[i].end) / 3600000;
+            if (gap < 2) {
+                resultsUl.innerHTML += `<li>🚨 מנוחה קצרה: ${s.name} נח רק ${gap} שעות בין משמרות.</li>`;
+                issuesFound++;
+            }
+        }
+        
+        // בדיקת התנגשות חריגים (למקרה שהוחלף ידנית)
+        globalExceptions.forEach(exc => {
+            if(exc.soldierName === s.name) {
+                sortedAssignments.forEach(asg => {
+                    if (Math.max(asg.start, exc.startMs) < Math.min(asg.end, exc.endMs)) {
+                        resultsUl.innerHTML += `<li>❌ התנגשות קריטית: ${s.name} משובץ למשמרת בזמן שהוא מוגדר ב${exc.type}!</li>`;
+                        issuesFound++;
+                    }
+                });
+            }
+        });
+    });
+
+    if (issuesFound === 0) {
+        resultsUl.innerHTML = '<li style="color:#27ae60;">✅ הלוח תקין, מאוזן והוגן לחלוטין. לא נמצאו חריגות.</li>';
+    }
+}
+
+// ---------------- הדו"ח האישי ----------------
+function generateSoldierReport() {
+    if (!isScheduleGenerated) return alert("יש לייצר לוח לפני הפקת דו\"ח.");
+    
+    const soldierName = document.getElementById('report-soldier-select').value;
+    if (!soldierName) return alert("נא לבחור חייל.");
 
     document.getElementById('report-results').style.display = 'block';
 
-    // טיפול בטבלת המשמרות
-    let shifts = globalSoldierShifts[soldierName] || [];
-    shifts.sort((a, b) => a.start - b.start);
-
-    let totalHours = 0;
+    let stats = globalStats[soldierName];
+    let shifts = [...stats.assignments].sort((a, b) => a.start - b.start);
     let tbody = document.getElementById('report-shifts-tbody');
     tbody.innerHTML = '';
 
     if (shifts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="color:#7f8c8d; padding:20px;">אין משמרות לחייל זה בלוח הנוכחי</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" style="color:#7f8c8d; padding:20px;">אין משמרות בלוח הנוכחי</td></tr>';
     } else {
         shifts.forEach((s, idx) => {
-            let sDate = new Date(s.start);
-            let eDate = new Date(s.end);
+            let sDate = new Date(s.start); let eDate = new Date(s.end);
             let duration = (s.end - s.start) / 3600000;
-            totalHours += duration;
 
             let restStr = '<span style="color:#bdc3c7;">משמרת אחרונה בלוח</span>';
             if (idx < shifts.length - 1) {
                 let nextS = shifts[idx+1];
                 let restHours = (nextS.start - s.end) / 3600000;
                 restStr = `<strong>${restHours}</strong> שעות`;
+                if (restHours < 2) restStr = `<span style="color:#e74c3c; font-weight:bold;">${restHours} שעות (אזהרה)</span>`;
             }
 
             let timeStr = `${sDate.getDate()}/${sDate.getMonth()+1} ${sDate.getHours().toString().padStart(2,'0')}:00 - ${eDate.getHours().toString().padStart(2,'0')}:00`;
@@ -537,9 +698,8 @@ function generateSoldierReport() {
     }
 
     document.getElementById('report-total-shifts').innerText = shifts.length;
-    document.getElementById('report-total-hours').innerText = totalHours;
+    document.getElementById('report-total-hours').innerText = stats.totalMs / 3600000;
 
-    // טיפול בטבלת החריגים
     let exc = globalExceptions.filter(e => e.soldierName === soldierName);
     let excTbody = document.getElementById('report-exc-tbody');
     excTbody.innerHTML = '';
@@ -548,39 +708,24 @@ function generateSoldierReport() {
          excTbody.innerHTML = '<tr><td colspan="3" style="color:#7f8c8d; padding:20px;">אין (חייל זמין לחלוטין)</td></tr>';
     } else {
         exc.forEach(e => {
-            let sDate = new Date(e.startMs);
-            let eDate = new Date(e.endMs);
+            let sDate = new Date(e.startMs); let eDate = new Date(e.endMs);
             let sStr = `${sDate.getDate()}/${sDate.getMonth()+1} ${sDate.getHours().toString().padStart(2,'0')}:${sDate.getMinutes().toString().padStart(2,'0')}`;
             let eStr = `${eDate.getDate()}/${eDate.getMonth()+1} ${eDate.getHours().toString().padStart(2,'0')}:${eDate.getMinutes().toString().padStart(2,'0')}`;
 
-            excTbody.innerHTML += `<tr>
-                <td style="font-weight:bold; color:#d35400;">${e.type}</td>
-                <td dir="ltr">${sStr}</td>
-                <td dir="ltr">${eStr}</td>
-            </tr>`;
+            excTbody.innerHTML += `<tr><td style="font-weight:bold; color:#d35400;">${e.type}</td><td dir="ltr">${sStr}</td><td dir="ltr">${eStr}</td></tr>`;
         });
     }
 }
 
 function exportToImage() {
     const captureArea = document.getElementById('capture-area');
-    if (!captureArea || globalPositions.length === 0) {
-        alert("אין נתונים בטבלה לייצוא.");
-        return;
-    }
-    
-    if(typeof html2canvas === 'undefined') {
-        alert("ספריית צילום המסך עדיין נטענת, נסה שוב בעוד שניה.");
-        return;
-    }
+    if (!captureArea || globalPositions.length === 0) return alert("אין נתונים בטבלה לייצוא.");
+    if(typeof html2canvas === 'undefined') return alert("ספריית צילום המסך עדיין נטענת, נסה שוב בעוד שניה.");
 
     html2canvas(captureArea, { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
         const link = document.createElement('a');
         link.download = `לוח_שיבוצים_${new Date().toLocaleDateString('he-IL').replace(/\./g, '-')}.png`;
         link.href = canvas.toDataURL('image/png');
         link.click(); 
-    }).catch(err => {
-        console.error(err);
-        alert("אירעה שגיאה בייצוא התמונה.");
-    });
+    }).catch(err => { console.error(err); alert("אירעה שגיאה בייצוא התמונה."); });
 }
